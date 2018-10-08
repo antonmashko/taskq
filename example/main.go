@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"sync/atomic"
+	"time"
 
 	"github.com/antonmashko/taskq"
 )
@@ -24,4 +25,5 @@ func main() {
 		log.Print("added task with id:", tq.Enqueue(&printer{}))
 	}
 	tq.Close()
+	time.Sleep(time.Second)
 }

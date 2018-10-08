@@ -35,8 +35,8 @@ type TaskQ struct {
 
 	lock sync.Mutex
 
-	TaskFailed func(Task)
 	TaskDone   func(Task)
+	TaskFailed func(Task, error)
 }
 
 func New() *TaskQ {
@@ -95,9 +95,11 @@ func (t *TaskQ) process(it *itask) {
 			}
 			if try < t.tasksMaxRetry {
 				continue
+			} else {
+				err = ErrMaxRetry
 			}
 			if t.TaskFailed != nil {
-				t.TaskFailed(it.task)
+				t.TaskFailed(it.task, err)
 			}
 			break
 		}
