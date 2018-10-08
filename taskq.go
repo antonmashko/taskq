@@ -6,7 +6,8 @@ import (
 )
 
 const (
-	Pending byte = iota
+	Ignored byte = iota
+	Pending
 	InProgress
 	Done
 	Failed
@@ -31,7 +32,6 @@ type TaskQ struct {
 	pending       *blockingQueue
 	tasksMaxRetry int
 	workersCount  int
-	done          bool
 
 	lock sync.Mutex
 
@@ -61,8 +61,9 @@ func (t *TaskQ) Enqueue(task Task) int64 {
 	}
 	select {
 	case t.queue <- it:
-		// if we can't send task to directly on workers
+		// successfully sent to the workers
 	default:
+		// if we can't send task to directly to the workers
 		// we add it to pending queue
 		t.pending.enqueue(it)
 	}
@@ -112,7 +113,6 @@ func (t *TaskQ) process(it *itask) {
 }
 
 func (t *TaskQ) Close() error {
-	t.done = true
 	close(t.queue)
 	return nil
 }
