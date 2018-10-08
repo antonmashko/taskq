@@ -64,7 +64,7 @@ func (t *TaskQ) Enqueue(task Task) int64 {
 		// if we can't send task to directly on workers
 	default:
 		// we add it to pending queue
-		t.pending.enqeue(it)
+		t.pending.enqueue(it)
 	}
 	return it.id
 }
@@ -77,7 +77,7 @@ func (t *TaskQ) Start() error {
 			for task := range t.queue {
 				for task != nil {
 					t.process(task)
-					task = t.pending.deqeue()
+					task = t.pending.dequeue()
 				}
 			}
 		}(i)
@@ -120,13 +120,13 @@ type blockingQueue struct {
 	queue []*itask
 }
 
-func (q *blockingQueue) enqeue(it *itask) {
+func (q *blockingQueue) enqueue(it *itask) {
 	q.lock.Lock()
 	q.queue = append(q.queue, it)
 	q.lock.Unlock()
 }
 
-func (q *blockingQueue) deqeue() *itask {
+func (q *blockingQueue) dequeue() *itask {
 	q.lock.Lock()
 	if len(q.queue) == 0 {
 		q.lock.Unlock()

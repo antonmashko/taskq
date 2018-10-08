@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"sync/atomic"
-	"time"
 
 	"github.com/antonmashko/taskq"
 )
@@ -20,10 +19,9 @@ func (p *printer) Do() error {
 
 func main() {
 	tq := taskq.New()
-	go tq.Start()
+	tq.Start()
 	for i := 0; i < 1000; i++ {
 		log.Print("added task with id:", tq.Enqueue(&printer{}))
 	}
 	tq.Close()
-	time.Sleep(2 * time.Second)
 }
