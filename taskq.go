@@ -28,7 +28,7 @@ type itask struct {
 
 type TaskQ struct {
 	lastInc       int64
-	queue         chan *itask
+	queue         chan struct{}
 	pending       *blockingQueue
 	tasksMaxRetry int
 	workersCount  int
@@ -43,7 +43,7 @@ func New() *TaskQ {
 	return &TaskQ{
 		workersCount:  WorkersPollSize,
 		tasksMaxRetry: TaskMaxRetry,
-		queue:         make(chan *itask, WorkersPollSize),
+		queue:         make(chan struct{}, WorkersPollSize),
 		pending: &blockingQueue{
 			queue: make([]*itask, 0, WorkersPollSize),
 		},
@@ -59,13 +59,13 @@ func (t *TaskQ) Enqueue(task Task) int64 {
 		state: Pending,
 		task:  task,
 	}
+	t.pending.enqueue(it)
 	select {
-	case t.queue <- it:
+	case t.queue <- struct{}{}:
 		// successfully sent to the workers
 	default:
 		// if we can't send task to directly to the workers
 		// we add it to pending queue
-		t.pending.enqueue(it)
 	}
 	return it.id
 }
@@ -75,10 +75,13 @@ func (t *TaskQ) Start() error {
 	for i := 0; i < t.workersCount-1; i++ {
 		// each worker will make task.Do
 		go func(workerID int) {
-			for task := range t.queue {
-				for task != nil {
+			for range t.queue {
+				for {
+					task := t.pending.dequeue()
+					if task == nil {
+						break
+					}
 					t.process(task)
-					task = t.pending.dequeue()
 				}
 			}
 		}(i)
@@ -124,11 +127,41 @@ type blockingQueue struct {
 
 func (q *blockingQueue) enqueue(it *itask) {
 	q.lock.Lock()
-	q.queue = append(q.queue, it)
+	q.queue[0] = it //= append(q.queue, it)
 	q.lock.Unlock()
 }
 
 func (q *blockingQueue) dequeue() *itask {
+	q.lock.Lock()
+	if len(q.queue) == 0 {
+		q.lock.Unlock()
+		return nil
+	}
+	it := q.queue[0]
+	q.queue = q.queue[1:]
+	q.lock.Unlock()
+	return it
+}
+
+type ringBlockingQueue struct {
+	lock     sync.Mutex
+	queue    []*itask
+	writeIdx int
+	readIdx  int
+}
+
+func (q *ringBlockingQueue) enqueue(it *itask) {
+	q.lock.Lock()
+	if q.writeIdx < len(q.queue) {
+
+	} else if q.readIdx == q.writeIdx {
+
+	}
+	q.queue[0] = it //= append(q.queue, it)
+	q.lock.Unlock()
+}
+
+func (q *ringBlockingQueue) dequeue() *itask {
 	q.lock.Lock()
 	if len(q.queue) == 0 {
 		q.lock.Unlock()
