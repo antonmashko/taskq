@@ -20,6 +20,23 @@ func BenchmarkBlockingQueue(b *testing.B) {
 	}
 }
 
+func BenchmarkRingBlockingQueue(b *testing.B) {
+	q := &ringBlockingQueue{queue: make([]*itask, 0, 1)}
+	q.queue = append(q.queue, &itask{})
+	for i := 0; i < b.N; i++ {
+		q.enqueue(&itask{})
+		q.dequeue()
+	}
+}
+
+func BenchmarkLinkedBlockingQueue(b *testing.B) {
+	q := &linkedBlockedQueue{}
+	for i := 0; i < b.N; i++ {
+		q.enqueue(&itask{})
+		q.dequeue()
+	}
+}
+
 // func TestBlockingQueue(t *testing.T) {
 // 	q := &blockingQueue{queue: make([]*itask, 0, WorkersPollSize)}
 // 	for i := 0; i < 10; i++ {
