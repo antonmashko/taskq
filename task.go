@@ -1,8 +1,18 @@
 package taskq
 
+import "errors"
+
+var ErrRetryTask = errors.New("error occurred during task execution. retry task")
+
 // Task for TaskQ
 type Task interface {
 	Do() error
+}
+
+type TaskFunc func() error
+
+func (t TaskFunc) Do() error {
+	return t()
 }
 
 type RetryableTask struct {
