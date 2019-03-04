@@ -37,12 +37,12 @@ func BenchmarkLinkedBlockingQueue(b *testing.B) {
 	}
 }
 
-// func TestBlockingQueue(t *testing.T) {
-// 	q := &blockingQueue{queue: make([]*itask, 0, WorkersPollSize)}
-// 	for i := 0; i < 10; i++ {
-// 		q.enqueue(&itask{})
-// 	}
-// 	if len(q.queue) != 10 {
-// 		t.Error("queue not woking")
-// 	}
-// }
+func TestBlockingQueue(t *testing.T) {
+	q := &blockingQueue{queue: make([]*itask, 0, WorkersPollSize)}
+	for i := 0; i < 10; i++ {
+		q.enqueue(&itask{})
+	}
+	if len(q.queue) != 10 {
+		t.Error("queue not woking")
+	}
+}
