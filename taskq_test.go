@@ -3,13 +3,40 @@ package taskq
 import (
 	"errors"
 	"reflect"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
 )
 
+func TestTaskStatusOk(t *testing.T) {
+	if TaskStatus(&itask{status: Pending}) != Pending {
+		t.Fail()
+	}
+
+}
+
+func TestTaskStatusErr(t *testing.T) {
+	if TaskStatus(nil) != None {
+		t.Fail()
+	}
+}
+
+func TestNilITaskStatusErr(t *testing.T) {
+	var it *itask
+	if TaskStatus(it) != None {
+		t.Fail()
+	}
+}
+
 func TestNewTaskQOk(t *testing.T) {
 	if tq := New(1); tq == nil {
+		t.Fail()
+	}
+}
+
+func TestNewTaskQNumCPUOk(t *testing.T) {
+	if tq := New(0); tq == nil || tq.size != runtime.NumCPU() {
 		t.Fail()
 	}
 }
