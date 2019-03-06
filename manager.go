@@ -2,38 +2,28 @@ package taskq
 
 import "sync"
 
-type managerTask struct {
-	task    Task
-	manager *TaskManager
-}
-
-func (t *managerTask) Do() error {
-	return nil
-}
-
 type TaskManager struct {
 	taskQ *TaskQ
 	lock  sync.RWMutex
-	tasks map[int64]*managerTask
+	tasks map[int64]*itask
 }
 
 func NewTaskManger(taskQ *TaskQ) *TaskManager {
 	return &TaskManager{
 		taskQ: taskQ,
-		tasks: make(map[int64]*managerTask),
+		tasks: make(map[int64]*itask),
 	}
 }
 
-func (m *TaskManager) add(id int64, task Task) {
-	m.lock.Lock()
-	m.tasks[id] = &managerTask{task: task, manager: m}
-	m.lock.Unlock()
-}
-
 func (m *TaskManager) Enqueue(task Task) int64 {
-	id := m.taskQ.Enqueue(task)
-	m.add(id, task)
-	return id
+	it := m.taskQ.enqueue(task)
+	if it == nil {
+		return -1
+	}
+	m.lock.Lock()
+	m.tasks[it.id] = it
+	m.lock.Unlock()
+	return it.id
 }
 
 func (m *TaskManager) Task(id int64) Task {

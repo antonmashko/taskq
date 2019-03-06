@@ -14,6 +14,13 @@ func TestNewTaskQOk(t *testing.T) {
 	}
 }
 
+func TestEnqueueNilTaskErr(t *testing.T) {
+	tq := New(1)
+	if tq.Enqueue(nil) != -1 {
+		t.Fail()
+	}
+}
+
 func TestEnqueueTaskOk(t *testing.T) {
 	tq := New(1)
 	var wg sync.WaitGroup

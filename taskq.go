@@ -5,8 +5,10 @@ import (
 	"sync/atomic"
 )
 
+type Status byte
+
 const (
-	Ignored byte = iota
+	None Status = iota
 	Pending
 	InProgress
 	Done
@@ -14,9 +16,20 @@ const (
 )
 
 type itask struct {
-	id    int64
-	state byte
-	task  Task
+	id     int64
+	status Status
+	task   Task
+}
+
+func (t *itask) Do() error {
+	return t.task.Do()
+}
+
+func TaskStatus(task Task) Status {
+	if it, ok := task.(*itask); ok {
+		return it.status
+	}
+	return None
 }
 
 type TaskQ struct {
@@ -45,14 +58,14 @@ func New(size int) *TaskQ {
 	}
 }
 
-func (t *TaskQ) Enqueue(task Task) int64 {
+func (t *TaskQ) enqueue(task Task) *itask {
 	if task == nil {
-		return -1
+		return nil
 	}
 	it := &itask{
-		id:    atomic.AddInt64(&t.lastInc, 1),
-		state: Pending,
-		task:  task,
+		id:     atomic.AddInt64(&t.lastInc, 1),
+		status: Pending,
+		task:   task,
 	}
 	t.pending.enqueue(it)
 	// notify worker about pending task
@@ -61,6 +74,14 @@ func (t *TaskQ) Enqueue(task Task) int64 {
 		// we have free worker
 	default:
 		// all worker's are busy
+	}
+	return it
+}
+
+func (t *TaskQ) Enqueue(task Task) int64 {
+	it := t.enqueue(task)
+	if it == nil {
+		return -1
 	}
 	return it.id
 }
@@ -85,15 +106,15 @@ func (t *TaskQ) Start() error {
 }
 
 func (t *TaskQ) process(it *itask) {
-	it.state = InProgress
+	it.status = InProgress
 	err := it.task.Do()
 	if err != nil {
-		it.state = Failed
+		it.status = Failed
 		if t.TaskFailed != nil {
 			t.TaskFailed(it.task, err)
 		}
 	}
-	it.state = Done
+	it.status = Done
 	if t.TaskDone != nil {
 		t.TaskDone(it.task)
 	}

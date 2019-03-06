@@ -25,13 +25,6 @@ func TestBlockingQueueDequeueOK(t *testing.T) {
 
 }
 
-// func BenchmarkChannel(b *testing.B) {
-// 	ch := make(chan *itask, 1)
-// 	for i := 0; i < b.N; i++ {
-// 		ch <- &itask{}
-// 		<-ch
-// 	}
-// }
 func BenchmarkBlockingQueue(b *testing.B) {
 	q := &blockingQueue{queue: make([]*itask, 0, 1)}
 	q.queue = append(q.queue, &itask{})
@@ -40,6 +33,14 @@ func BenchmarkBlockingQueue(b *testing.B) {
 		q.dequeue()
 	}
 }
+
+// func BenchmarkChannel(b *testing.B) {
+// 	ch := make(chan *itask, 1)
+// 	for i := 0; i < b.N; i++ {
+// 		ch <- &itask{}
+// 		<-ch
+// 	}
+// }
 
 // func BenchmarkRingBlockingQueue(b *testing.B) {
 // 	q := &ringBlockingQueue{queue: make([]*itask, 0, 1)}
