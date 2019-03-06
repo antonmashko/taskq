@@ -1,6 +1,7 @@
 package taskq
 
 import (
+	"runtime"
 	"sync"
 	"sync/atomic"
 )
@@ -26,7 +27,7 @@ func (t *itask) Do() error {
 }
 
 func TaskStatus(task Task) Status {
-	if it, ok := task.(*itask); ok {
+	if it, ok := task.(*itask); ok && it != nil {
 		return it.status
 	}
 	return None
@@ -46,8 +47,8 @@ type TaskQ struct {
 }
 
 func New(size int) *TaskQ {
-	if size < 0 {
-		return nil
+	if size < 1 {
+		size = runtime.NumCPU()
 	}
 	return &TaskQ{
 		size:  size,
