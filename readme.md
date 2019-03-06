@@ -5,3 +5,5 @@
 [![Codecov](https://img.shields.io/codecov/c/github/antonmashko/taskq.svg)](https://codecov.io/gh/antonmashko/taskq)
 
 Goroutine manager. 
+
+---
