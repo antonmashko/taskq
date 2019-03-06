@@ -5,33 +5,39 @@ import (
 	"sync/atomic"
 )
 
+type Status byte
+
 const (
-	Ignored byte = iota
+	None Status = iota
 	Pending
 	InProgress
 	Done
 	Failed
 )
 
-var WorkersPollSize = 10
-var TaskMaxRetry = 3
-
-type Task interface {
-	Do() error
+type itask struct {
+	id     int64
+	status Status
+	task   Task
 }
 
-type itask struct {
-	id    int64
-	state byte
-	task  Task
+func (t *itask) Do() error {
+	return t.task.Do()
+}
+
+func TaskStatus(task Task) Status {
+	if it, ok := task.(*itask); ok {
+		return it.status
+	}
+	return None
 }
 
 type TaskQ struct {
-	lastInc       int64
-	queue         chan *itask
-	pending       *blockingQueue
-	tasksMaxRetry int
-	workersCount  int
+	lastInc int64
+	queue   chan struct{}
+	pending *blockingQueue
+	//tasksMaxRetry int
+	size int
 
 	lock sync.Mutex
 
@@ -39,46 +45,59 @@ type TaskQ struct {
 	TaskFailed func(Task, error)
 }
 
-func New() *TaskQ {
+func New(size int) *TaskQ {
+	if size < 0 {
+		return nil
+	}
 	return &TaskQ{
-		workersCount:  WorkersPollSize,
-		tasksMaxRetry: TaskMaxRetry,
-		queue:         make(chan *itask, WorkersPollSize),
+		size:  size,
+		queue: make(chan struct{}, size),
 		pending: &blockingQueue{
-			queue: make([]*itask, 0, WorkersPollSize),
+			queue: make([]*itask, 0, size),
 		},
 	}
 }
 
-func (t *TaskQ) Enqueue(task Task) int64 {
+func (t *TaskQ) enqueue(task Task) *itask {
 	if task == nil {
-		return -1
+		return nil
 	}
 	it := &itask{
-		id:    atomic.AddInt64(&t.lastInc, 1),
-		state: Pending,
-		task:  task,
+		id:     atomic.AddInt64(&t.lastInc, 1),
+		status: Pending,
+		task:   task,
 	}
+	t.pending.enqueue(it)
+	// notify worker about pending task
 	select {
-	case t.queue <- it:
-		// successfully sent to the workers
+	case t.queue <- struct{}{}:
+		// we have free worker
 	default:
-		// if we can't send task to directly to the workers
-		// we add it to pending queue
-		t.pending.enqueue(it)
+		// all worker's are busy
+	}
+	return it
+}
+
+func (t *TaskQ) Enqueue(task Task) int64 {
+	it := t.enqueue(task)
+	if it == nil {
+		return -1
 	}
 	return it.id
 }
 
 func (t *TaskQ) Start() error {
 	// run process workers
-	for i := 0; i < t.workersCount-1; i++ {
+	for i := 0; i < t.size; i++ {
 		// each worker will make task.Do
 		go func(workerID int) {
-			for task := range t.queue {
-				for task != nil {
+			for range t.queue {
+				for {
+					task := t.pending.dequeue()
+					if task == nil {
+						break
+					}
 					t.process(task)
-					task = t.pending.dequeue()
 				}
 			}
 		}(i)
@@ -87,55 +106,21 @@ func (t *TaskQ) Start() error {
 }
 
 func (t *TaskQ) process(it *itask) {
-	it.state = InProgress
-	var try int
-	for {
-		if err := it.task.Do(); err != nil {
-			if err == ErrRetryTask {
-				try++
-			}
-			if try < t.tasksMaxRetry {
-				continue
-			} else {
-				err = ErrMaxRetry
-			}
-			if t.TaskFailed != nil {
-				t.TaskFailed(it.task, err)
-			}
-			break
+	it.status = InProgress
+	err := it.task.Do()
+	if err != nil {
+		it.status = Failed
+		if t.TaskFailed != nil {
+			t.TaskFailed(it.task, err)
 		}
-		it.state = Done
-		if t.TaskDone != nil {
-			t.TaskDone(it.task)
-		}
-		break
+	}
+	it.status = Done
+	if t.TaskDone != nil {
+		t.TaskDone(it.task)
 	}
 }
 
 func (t *TaskQ) Close() error {
 	close(t.queue)
 	return nil
-}
-
-type blockingQueue struct {
-	lock  sync.Mutex
-	queue []*itask
-}
-
-func (q *blockingQueue) enqueue(it *itask) {
-	q.lock.Lock()
-	q.queue = append(q.queue, it)
-	q.lock.Unlock()
-}
-
-func (q *blockingQueue) dequeue() *itask {
-	q.lock.Lock()
-	if len(q.queue) == 0 {
-		q.lock.Unlock()
-		return nil
-	}
-	it := q.queue[0]
-	q.queue = q.queue[1:]
-	q.lock.Unlock()
-	return it
 }
