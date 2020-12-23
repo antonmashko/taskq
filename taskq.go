@@ -1,6 +1,7 @@
 package taskq
 
 import (
+	"context"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -22,8 +23,8 @@ type itask struct {
 	task   Task
 }
 
-func (t *itask) Do() error {
-	return t.task.Do()
+func (t *itask) Do(ctx context.Context) error {
+	return t.task.Do(ctx)
 }
 
 func TaskStatus(task Task) Status {
@@ -108,7 +109,7 @@ func (t *TaskQ) Start() error {
 
 func (t *TaskQ) process(it *itask) {
 	it.status = InProgress
-	err := it.task.Do()
+	err := it.task.Do(context.Background())
 	if err != nil {
 		it.status = Failed
 		if t.TaskFailed != nil {

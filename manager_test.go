@@ -1,13 +1,14 @@
 package taskq
 
 import (
+	"context"
 	"testing"
 )
 
 func TestTaskFromTaskMenegerOk(t *testing.T) {
 	m := NewTaskManger(New(1))
 	block := make(chan struct{})
-	task := TaskFunc(func() error {
+	task := TaskFunc(func(ctx context.Context) error {
 		<-block
 		return nil
 	})

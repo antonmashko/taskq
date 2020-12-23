@@ -1,6 +1,7 @@
 package taskq
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"runtime"
@@ -53,7 +54,7 @@ func TestEnqueueTaskOk(t *testing.T) {
 	var wg sync.WaitGroup
 	var i int32
 	wg.Add(1)
-	tq.Enqueue(TaskFunc(func() error {
+	tq.Enqueue(TaskFunc(func(ctx context.Context) error {
 		atomic.AddInt32(&i, 1)
 		wg.Done()
 		return nil
@@ -73,7 +74,7 @@ func TestEnqueuUniqueIDOk(t *testing.T) {
 	const count = 100
 	wg.Add(count)
 	for i := 0; i < count; i++ {
-		id := tq.Enqueue(TaskFunc(func() error {
+		id := tq.Enqueue(TaskFunc(func(ctx context.Context) error {
 			wg.Done()
 			return nil
 		}))
@@ -91,7 +92,7 @@ func TestEnqueuUniqueIDOk(t *testing.T) {
 func TestDoneCallbackOk(t *testing.T) {
 	tq := New(1)
 	var ok bool
-	task := TaskFunc(func() error { return nil })
+	task := TaskFunc(func(ctx context.Context) error { return nil })
 	tq.TaskDone = func(t Task) {
 		if reflect.ValueOf(t).Pointer() == reflect.ValueOf(task).Pointer() {
 			ok = true
@@ -107,7 +108,7 @@ func TestFailedCallbackOk(t *testing.T) {
 	tq := New(1)
 	var ok bool
 	var cErr = errors.New("error")
-	task := TaskFunc(func() error { return cErr })
+	task := TaskFunc(func(ctx context.Context) error { return cErr })
 	tq.TaskFailed = func(t Task, err error) {
 		if reflect.ValueOf(t).Pointer() == reflect.ValueOf(task).Pointer() && err == cErr {
 			ok = true
