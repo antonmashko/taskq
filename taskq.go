@@ -36,6 +36,7 @@ func TaskStatus(task Task) Status {
 
 type TaskQ struct {
 	lastInc int64
+	isClosed chan struct{}
 	queue   chan struct{}
 	pending *blockingQueue
 	//tasksMaxRetry int
@@ -53,6 +54,7 @@ func New(size int) *TaskQ {
 	}
 	return &TaskQ{
 		size:  size,
+		isClosed: make(chan struct{}),
 		queue: make(chan struct{}, size),
 		pending: &blockingQueue{
 			queue: make([]*itask, 0, size),
@@ -72,10 +74,14 @@ func (t *TaskQ) enqueue(task Task) *itask {
 	t.pending.enqueue(it)
 	// notify worker about pending task
 	select {
-	case t.queue <- struct{}{}:
-		// we have free worker
+	case <- t.isClosed:
 	default:
-		// all worker's are busy
+		select {
+		case t.queue <- struct{}{}:
+			// we have free worker
+		default:
+			// all worker's are busy
+		}
 	}
 	return it
 }
@@ -123,6 +129,11 @@ func (t *TaskQ) process(it *itask) {
 }
 
 func (t *TaskQ) Close() error {
-	close(t.queue)
+	select {
+	case <-t.isClosed:
+	default:
+		close(t.isClosed)
+		close(t.queue)
+	}
 	return nil
 }

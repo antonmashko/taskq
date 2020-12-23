@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"sync/atomic"
@@ -14,7 +13,7 @@ var counter = int32(0)
 
 type printer struct{}
 
-func (p *printer) Do(_ context.Context) error {
+func (p *printer) Do() error {
 	fmt.Println("global counter:", atomic.AddInt32(&counter, 1))
 	return nil
 }
