@@ -93,7 +93,7 @@ func TestDoneCallbackOk(t *testing.T) {
 	tq := New(1)
 	var ok bool
 	task := TaskFunc(func(ctx context.Context) error { return nil })
-	tq.TaskDone = func(t Task) {
+	tq.TaskDone = func(_ int64, t Task) {
 		if reflect.ValueOf(t).Pointer() == reflect.ValueOf(task).Pointer() {
 			ok = true
 		}
@@ -109,7 +109,7 @@ func TestFailedCallbackOk(t *testing.T) {
 	var ok bool
 	var cErr = errors.New("error")
 	task := TaskFunc(func(ctx context.Context) error { return cErr })
-	tq.TaskFailed = func(t Task, err error) {
+	tq.TaskFailed = func(_ int64, t Task, err error) {
 		if reflect.ValueOf(t).Pointer() == reflect.ValueOf(task).Pointer() && err == cErr {
 			ok = true
 		}

@@ -43,8 +43,8 @@ type TaskQ struct {
 
 	lock sync.Mutex
 
-	TaskDone   func(Task)
-	TaskFailed func(Task, error)
+	TaskDone   func(int64, Task)
+	TaskFailed func(int64, Task, error)
 }
 
 func New(size int) *TaskQ {
@@ -113,12 +113,12 @@ func (t *TaskQ) process(it *itask) {
 	if err != nil {
 		it.status = Failed
 		if t.TaskFailed != nil {
-			t.TaskFailed(it.task, err)
+			t.TaskFailed(it.id, it.task, err)
 		}
 	}
 	it.status = Done
 	if t.TaskDone != nil {
-		t.TaskDone(it.task)
+		t.TaskDone(it.id, it.task)
 	}
 }
 
