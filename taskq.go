@@ -122,7 +122,6 @@ func (t *TaskQ) process(it *itask) {
 	}
 }
 
-func (t *TaskQ) Close() error {
+func (t *TaskQ) Close() {
 	close(t.queue)
-	return nil
 }

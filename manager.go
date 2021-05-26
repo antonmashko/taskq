@@ -41,6 +41,6 @@ func (m *TaskManager) Start() error {
 	return m.taskQ.Start()
 }
 
-func (m *TaskManager) Close() error {
-	return m.taskQ.Close()
+func (m *TaskManager) Close() {
+	m.taskQ.Close()
 }
