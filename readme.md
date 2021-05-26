@@ -7,3 +7,26 @@
 Goroutine manager. 
 
 ---
+## Installing 
+```bash
+go get github.com/antonmashko/taskq
+```
+
+## TaskQ
+### Initializing
+Use TaskQ for managing you goroutines. 
+```golang
+taskq := New(<size>)
+```
+size - parameter will control goroutines count. In case if all goroutines are busy, task will be added to queue and will wait for a free worker (goroutine) from pool.
+
+### Add task to TaskQ
+```golang
+taskID := taskq.Enqueue(<task>)
+```
+
+### Start TaskQ
+```golang
+err := taskq.Start()
+```
+run all added and future tasks in taskq.
