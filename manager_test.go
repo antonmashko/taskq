@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestTaskFromTaskMenegerOk(t *testing.T) {
+func TestTaskFromTaskManagerOk(t *testing.T) {
 	m := NewTaskManger(New(1))
 	block := make(chan struct{})
 	task := TaskFunc(func(ctx context.Context) error {

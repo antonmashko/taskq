@@ -37,7 +37,7 @@ func TestNewTaskQOk(t *testing.T) {
 }
 
 func TestNewTaskQNumCPUOk(t *testing.T) {
-	if tq := New(0); tq == nil || tq.size != runtime.NumCPU() {
+	if tq := New(0); tq == nil || len(tq.workers) != runtime.NumCPU() {
 		t.Fail()
 	}
 }
@@ -67,7 +67,7 @@ func TestEnqueueTaskOk(t *testing.T) {
 	}
 }
 
-func TestEnqueuUniqueIDOk(t *testing.T) {
+func TestEnqueueUniqueIDOk(t *testing.T) {
 	tq := New(1)
 	var wg sync.WaitGroup
 	unique := make(map[int64]struct{})
@@ -84,9 +84,10 @@ func TestEnqueuUniqueIDOk(t *testing.T) {
 			unique[id] = struct{}{}
 		}
 	}
+
 	tq.Start()
-	tq.Close()
 	wg.Wait()
+	tq.Close()
 }
 
 func TestDoneCallbackOk(t *testing.T) {
@@ -98,7 +99,7 @@ func TestDoneCallbackOk(t *testing.T) {
 			ok = true
 		}
 	}
-	tq.process(&itask{id: 0, task: task})
+	tq.process(context.Background(), &itask{id: 0, task: task})
 	if !ok {
 		t.Fail()
 	}
@@ -114,7 +115,7 @@ func TestFailedCallbackOk(t *testing.T) {
 			ok = true
 		}
 	}
-	tq.process(&itask{id: 0, task: task})
+	tq.process(context.Background(), &itask{id: 0, task: task})
 	if !ok {
 		t.Fail()
 	}

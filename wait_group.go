@@ -8,7 +8,8 @@ import (
 type TaskQInterface interface {
 	Enqueue(Task) int64
 	Start() error
-	Close()
+	Shutdown(ctx context.Context) error
+	Close() error
 }
 
 type WaitGroup struct {

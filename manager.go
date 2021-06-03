@@ -1,6 +1,9 @@
 package taskq
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 type TaskManager struct {
 	taskQ *TaskQ
@@ -41,6 +44,10 @@ func (m *TaskManager) Start() error {
 	return m.taskQ.Start()
 }
 
-func (m *TaskManager) Close() {
-	m.taskQ.Close()
+func (m *TaskManager) Shutdown(ctx context.Context) error {
+	return m.taskQ.Shutdown(ctx)
+}
+
+func (m *TaskManager) Close() error {
+	return m.taskQ.Close()
 }
