@@ -5,32 +5,31 @@ import (
 )
 
 func TestBlockingQueueEnqueueOK(t *testing.T) {
-	q := &blockingQueue{queue: make([]*itask, 0, 10)}
+	q := NewConcurrentQueue()
 	for i := 0; i < 10; i++ {
-		q.enqueue(&itask{})
+		q.Enqueue(&itask{})
 	}
-	if len(q.queue) != 10 {
+	if len(q.(*ConcurrentQueue).queue) != 10 {
 		t.Fail()
 	}
 }
 
 func TestBlockingQueueDequeueOK(t *testing.T) {
-	q := &blockingQueue{queue: make([]*itask, 0, 1)}
+	q := NewConcurrentQueue()
 	t1 := &itask{}
-	q.enqueue(t1)
-	t2 := q.dequeue()
+	q.Enqueue(t1)
+	t2 := q.Dequeue()
 	if t1 != t2 {
 		t.Fail()
 	}
-
 }
 
 func BenchmarkBlockingQueue(b *testing.B) {
-	q := &blockingQueue{queue: make([]*itask, 0, 1)}
-	q.queue = append(q.queue, &itask{})
+	q := NewConcurrentQueue()
+	// q.queue = append(q.queue, &itask{})
 	for i := 0; i < b.N; i++ {
-		q.enqueue(&itask{})
-		q.dequeue()
+		q.Enqueue(&itask{})
+		q.Dequeue()
 	}
 }
 

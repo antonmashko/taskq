@@ -50,12 +50,28 @@ type worker struct {
 	stop   func()
 }
 
+type adaptedQueue struct {
+	Queue
+}
+
+func (q *adaptedQueue) enqueue(it *itask) {
+	q.Queue.Enqueue(it)
+}
+
+func (q *adaptedQueue) dequeue() *itask {
+	t := q.Queue.Dequeue()
+	if t == nil {
+		return nil
+	}
+	return t.(*itask)
+}
+
 type TaskQ struct {
 	lastInc int64
 
 	closed     int32
 	hasUpdates chan struct{}
-	pending    *blockingQueue
+	pending    *adaptedQueue
 
 	workers []*worker
 
@@ -64,15 +80,17 @@ type TaskQ struct {
 }
 
 func New(size int) *TaskQ {
+	return NewWithQueue(size, NewConcurrentQueue())
+}
+
+func NewWithQueue(size int, q Queue) *TaskQ {
 	if size < 1 {
 		size = runtime.NumCPU()
 	}
 	return &TaskQ{
 		hasUpdates: make(chan struct{}, size),
 		workers:    make([]*worker, size),
-		pending: &blockingQueue{
-			queue: make([]*itask, 0, size),
-		},
+		pending:    &adaptedQueue{Queue: q},
 	}
 }
 
