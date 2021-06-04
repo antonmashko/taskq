@@ -35,7 +35,7 @@ func TaskStatus(task Task) Status {
 	return None
 }
 
-type workerStatus byte
+type workerStatus int32
 
 const (
 	registered workerStatus = iota
@@ -48,6 +48,14 @@ type worker struct {
 	id     int
 	status workerStatus
 	stop   func()
+}
+
+func (w *worker) isStatus(s workerStatus) bool {
+	return workerStatus(atomic.LoadInt32((*int32)(&w.status))) == s
+}
+
+func (w *worker) setStatus(s workerStatus) {
+	atomic.StoreInt32((*int32)(&w.status), int32(s))
 }
 
 type adaptedQueue struct {
@@ -141,17 +149,17 @@ func (t *TaskQ) Start() error {
 		go func(ctx context.Context, w *worker) {
 			started <- struct{}{}
 			for {
-				w.status = idle
+				w.setStatus(idle)
 				select {
 				case <-ctx.Done():
-					w.status = stopped
+					w.setStatus(stopped)
 					return
 				case _, ok := <-t.hasUpdates:
 					if !ok {
-						w.status = stopped
+						w.setStatus(stopped)
 						return
 					}
-					w.status = live
+					w.setStatus(live)
 					for {
 						task := t.pending.dequeue()
 						if task == nil {
@@ -202,7 +210,7 @@ func (t *TaskQ) Shutdown(ctx context.Context) error {
 	for {
 		exit := true
 		for _, w := range t.workers {
-			if w.status != stopped {
+			if !w.isStatus(stopped) {
 				exit = false
 				break
 			}
