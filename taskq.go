@@ -185,11 +185,19 @@ func (t *TaskQ) process(ctx context.Context, it *itask) {
 	err := it.task.Do(ctx)
 	if err != nil {
 		it.status = Failed
+		if event, ok := it.task.(TaskOnError); ok && event != nil {
+			event.OnError(ctx, it.id, err)
+		}
 		if t.TaskFailed != nil {
 			t.TaskFailed(it.id, it.task, err)
 		}
+		return
 	}
+
 	it.status = Done
+	if event, ok := it.task.(TaskDone); ok && event != nil {
+		event.Done(ctx, it.id)
+	}
 	if t.TaskDone != nil {
 		t.TaskDone(it.id, it.task)
 	}
@@ -215,6 +223,7 @@ func (t *TaskQ) Shutdown(ctx context.Context) error {
 				break
 			}
 		}
+
 		if exit {
 			return nil
 		}

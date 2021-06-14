@@ -120,3 +120,61 @@ func TestFailedCallbackOk(t *testing.T) {
 		t.Fail()
 	}
 }
+
+type testTask struct {
+	fOnError func(context.Context, int64, error)
+	fdone    func(context.Context, int64)
+
+	resultErr error
+}
+
+func (t *testTask) OnError(ctx context.Context, id int64, err error) {
+	t.fOnError(ctx, id, err)
+}
+
+func (t *testTask) Done(ctx context.Context, id int64) {
+	t.fdone(ctx, id)
+}
+
+func (t *testTask) Do(_ context.Context) error {
+	return t.resultErr
+}
+
+func TestTaskDoneEvent(t *testing.T) {
+	rch := make(chan bool)
+	tt := &testTask{
+		fdone: func(ctx context.Context, i int64) {
+			rch <- true
+		},
+	}
+
+	tq := New(1)
+	tq.Start()
+	tq.Enqueue(tt)
+
+	if res := <-rch; !res {
+		t.Fail()
+	}
+}
+
+func TestTaskOnErrorEvent(t *testing.T) {
+	rch := make(chan error)
+	err := errors.New("task failed")
+	tt := &testTask{
+		resultErr: err,
+		fOnError: func(c context.Context, i int64, e error) {
+			rch <- e
+		},
+		fdone: func(ctx context.Context, i int64) {
+			panic("done event invoked")
+		},
+	}
+
+	tq := New(1)
+	tq.Start()
+	tq.Enqueue(tt)
+
+	if tErr := <-rch; tErr != err {
+		t.Fail()
+	}
+}
