@@ -8,33 +8,6 @@ import (
 	"time"
 )
 
-type Status byte
-
-const (
-	None Status = iota
-	Pending
-	InProgress
-	Done
-	Failed
-)
-
-type itask struct {
-	id     int64
-	status Status
-	task   Task
-}
-
-func (t *itask) Do(ctx context.Context) error {
-	return t.task.Do(ctx)
-}
-
-func TaskStatus(task Task) Status {
-	if it, ok := task.(*itask); ok && it != nil {
-		return it.status
-	}
-	return None
-}
-
 type workerStatus int32
 
 const (
@@ -58,33 +31,12 @@ func (w *worker) setStatus(s workerStatus) {
 	atomic.StoreInt32((*int32)(&w.status), int32(s))
 }
 
-type adaptedQueue struct {
-	Queue
-}
-
-func (q *adaptedQueue) enqueue(it *itask) {
-	q.Queue.Enqueue(it)
-}
-
-func (q *adaptedQueue) dequeue() *itask {
-	t := q.Queue.Dequeue()
-	if t == nil {
-		return nil
-	}
-	return t.(*itask)
-}
-
 type TaskQ struct {
-	lastInc int64
-
 	closed     int32
 	hasUpdates chan struct{}
-	pending    *adaptedQueue
+	pending    Queue
 
 	workers []*worker
-
-	TaskDone   func(int64, Task)
-	TaskFailed func(int64, Task, error)
 }
 
 func New(size int) *TaskQ {
@@ -98,30 +50,17 @@ func NewWithQueue(size int, q Queue) *TaskQ {
 	return &TaskQ{
 		hasUpdates: make(chan struct{}, size),
 		workers:    make([]*worker, size),
-		pending:    &adaptedQueue{Queue: q},
+		pending:    q,
 	}
-}
-
-func (t *TaskQ) enqueue(task Task) *itask {
-	if atomic.LoadInt32(&t.closed) != 0 || task == nil {
-		return nil
-	}
-	it := &itask{
-		id:     atomic.AddInt64(&t.lastInc, 1),
-		status: Pending,
-		task:   task,
-	}
-	t.pending.enqueue(it)
-	t.triggerUpdateNotification()
-	return it
 }
 
 func (t *TaskQ) Enqueue(task Task) int64 {
-	it := t.enqueue(task)
-	if it == nil {
+	if atomic.LoadInt32(&t.closed) != 0 || task == nil {
 		return -1
 	}
-	return it.id
+	id := t.pending.Enqueue(task)
+	t.triggerUpdateNotification()
+	return id
 }
 
 func (t *TaskQ) triggerUpdateNotification() bool {
@@ -161,7 +100,7 @@ func (t *TaskQ) Start() error {
 					}
 					w.setStatus(live)
 					for {
-						task := t.pending.dequeue()
+						task := t.pending.Dequeue()
 						if task == nil {
 							break
 						}
@@ -180,26 +119,17 @@ func (t *TaskQ) Start() error {
 	return nil
 }
 
-func (t *TaskQ) process(ctx context.Context, it *itask) {
-	it.status = InProgress
-	err := it.task.Do(ctx)
+func (t *TaskQ) process(ctx context.Context, task Task) {
+	err := task.Do(ctx)
 	if err != nil {
-		it.status = Failed
-		if event, ok := it.task.(TaskOnError); ok && event != nil {
-			event.OnError(ctx, it.id, err)
-		}
-		if t.TaskFailed != nil {
-			t.TaskFailed(it.id, it.task, err)
+		if event, ok := task.(TaskOnError); ok && event != nil {
+			event.OnError(ctx, err)
 		}
 		return
 	}
 
-	it.status = Done
-	if event, ok := it.task.(TaskDone); ok && event != nil {
-		event.Done(ctx, it.id)
-	}
-	if t.TaskDone != nil {
-		t.TaskDone(it.id, it.task)
+	if event, ok := task.(TaskDone); ok && event != nil {
+		event.Done(ctx)
 	}
 }
 

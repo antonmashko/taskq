@@ -1,13 +1,14 @@
 package taskq
 
 import (
+	"context"
 	"testing"
 )
 
 func TestBlockingQueueEnqueueOK(t *testing.T) {
 	q := NewConcurrentQueue()
 	for i := 0; i < 10; i++ {
-		q.Enqueue(&itask{})
+		q.Enqueue(TaskFunc(func(ctx context.Context) error { return nil }))
 	}
 	if len(q.(*ConcurrentQueue).queue) != 10 {
 		t.Fail()
@@ -16,10 +17,15 @@ func TestBlockingQueueEnqueueOK(t *testing.T) {
 
 func TestBlockingQueueDequeueOK(t *testing.T) {
 	q := NewConcurrentQueue()
-	t1 := &itask{}
+	var result int
+	t1 := TaskFunc(func(ctx context.Context) error {
+		result++
+		return nil
+	})
 	q.Enqueue(t1)
 	t2 := q.Dequeue()
-	if t1 != t2 {
+	err := t2.Do(context.Background())
+	if err != nil || result != 1 {
 		t.Fail()
 	}
 }
@@ -28,7 +34,7 @@ func BenchmarkBlockingQueue(b *testing.B) {
 	q := NewConcurrentQueue()
 	// q.queue = append(q.queue, &itask{})
 	for i := 0; i < b.N; i++ {
-		q.Enqueue(&itask{})
+		q.Enqueue(TaskFunc(func(ctx context.Context) error { return nil }))
 		q.Dequeue()
 	}
 }

@@ -22,15 +22,3 @@ func TestWaitGroupEnqueue(t *testing.T) {
 		t.Fatal("invalid result number")
 	}
 }
-
-func TestConvertToWaitGroup(t *testing.T) {
-	wg := ConvertToWaitGroup(New(0))
-	if wg == nil {
-		t.Fatal("failed to convert taskq to waitgroup")
-	}
-
-	wg = ConvertToWaitGroup(NewTaskManger(New(0)))
-	if wg == nil {
-		t.Fatal("failed to convert taskq to waitgroup")
-	}
-}

@@ -1,24 +1,29 @@
 package taskq
 
-import "sync"
+import (
+	"sync"
+	"sync/atomic"
+)
 
 type Queue interface {
-	Enqueue(Task)
+	Enqueue(Task) int64
 	Dequeue() Task
 }
 type ConcurrentQueue struct {
-	lock  sync.Mutex
-	queue []Task
+	lock   sync.Mutex
+	queue  []Task
+	lastId int64
 }
 
 func NewConcurrentQueue() Queue {
 	return &ConcurrentQueue{}
 }
 
-func (q *ConcurrentQueue) Enqueue(t Task) {
+func (q *ConcurrentQueue) Enqueue(t Task) int64 {
 	q.lock.Lock()
 	q.queue = append(q.queue, t)
 	q.lock.Unlock()
+	return atomic.AddInt64(&q.lastId, 1)
 }
 
 func (q *ConcurrentQueue) Dequeue() Task {
@@ -34,15 +39,17 @@ func (q *ConcurrentQueue) Dequeue() Task {
 }
 
 type LimitedConcurrentQueue struct {
-	ch chan Task
+	ch     chan Task
+	lastId int64
 }
 
 func NewLimitedConcurrentQueue(size int) Queue {
 	return &LimitedConcurrentQueue{ch: make(chan Task, size)}
 }
 
-func (q *LimitedConcurrentQueue) Enqueue(t Task) {
+func (q *LimitedConcurrentQueue) Enqueue(t Task) int64 {
 	q.ch <- t
+	return atomic.AddInt64(&q.lastId, 1)
 }
 
 func (q *LimitedConcurrentQueue) Dequeue() Task {

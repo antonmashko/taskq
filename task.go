@@ -13,11 +13,11 @@ type Task interface {
 }
 
 type TaskDone interface {
-	Done(context.Context, int64)
+	Done(context.Context)
 }
 
 type TaskOnError interface {
-	OnError(context.Context, int64, error)
+	OnError(context.Context, error)
 }
 
 type TaskFunc func(ctx context.Context) error
