@@ -12,16 +12,12 @@ type Task interface {
 	Do(ctx context.Context) error
 }
 
-type TaskContext interface {
-	Context() context.Context
-}
-
 type TaskDone interface {
-	Done(context.Context, int64)
+	Done(context.Context)
 }
 
 type TaskOnError interface {
-	OnError(context.Context, int64, error)
+	OnError(context.Context, error)
 }
 
 type TaskFunc func(ctx context.Context) error

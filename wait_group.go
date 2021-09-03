@@ -5,33 +5,26 @@ import (
 	"sync"
 )
 
-type TaskQInterface interface {
-	Enqueue(context.Context, Task) (int64, error)
-	Start() error
-	Shutdown(ctx context.Context) error
-	Close() error
-}
-
 type WaitGroup struct {
-	TaskQInterface
+	*TaskQ
 	wg sync.WaitGroup
 }
 
 func NewWaitGroup(size int) *WaitGroup {
 	return &WaitGroup{
-		TaskQInterface: New(size),
+		TaskQ: New(size),
 	}
 }
 
-func ConvertToWaitGroup(taskq TaskQInterface) *WaitGroup {
+func NewWaitGroupFromTaskq(taskq *TaskQ) *WaitGroup {
 	return &WaitGroup{
-		TaskQInterface: taskq,
+		TaskQ: taskq,
 	}
 }
 
 func (wg *WaitGroup) Enqueue(ctx context.Context, task Task) (int64, error) {
 	wg.wg.Add(1)
-	return wg.TaskQInterface.Enqueue(ctx, TaskFunc(func(ctx context.Context) error {
+	return wg.TaskQ.Enqueue(ctx, TaskFunc(func(ctx context.Context) error {
 		err := task.Do(ctx)
 		wg.wg.Done()
 		return err

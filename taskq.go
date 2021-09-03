@@ -14,39 +14,6 @@ var (
 	ErrNilTask = errors.New("nil task")
 )
 
-type Status byte
-
-const (
-	None Status = iota
-	Pending
-	InProgress
-	Done
-	Failed
-)
-
-type itask struct {
-	id     int64
-	status Status
-	task   Task
-
-	ctx context.Context
-}
-
-func (t *itask) Context() context.Context {
-	return t.ctx
-}
-
-func (t *itask) Do(ctx context.Context) error {
-	return t.task.Do(ctx)
-}
-
-func TaskStatus(task Task) Status {
-	if it, ok := task.(*itask); ok && it != nil {
-		return it.status
-	}
-	return None
-}
-
 type workerStatus int32
 
 const (
@@ -71,16 +38,11 @@ func (w *worker) setStatus(s workerStatus) {
 }
 
 type TaskQ struct {
-	lastInc int64
-
 	closed     int32
 	hasUpdates chan struct{}
 	pending    Queue
 
 	workers []*worker
-
-	TaskDone   func(int64, Task)
-	TaskFailed func(int64, Task, error)
 }
 
 func New(size int) *TaskQ {
@@ -158,15 +120,9 @@ func (t *TaskQ) Start() error {
 							}
 						}
 
-						it := &itask{
-							status: Pending,
-							task:   task,
-							ctx:    ctx,
-						}
-
 						// if some of workers in idle state we will trigger it for processing tasks from queue
 						t.triggerUpdateNotification()
-						t.process(ctx, it)
+						t.process(ctx, task)
 					}
 				}
 			}
@@ -179,26 +135,17 @@ func (t *TaskQ) Start() error {
 	return nil
 }
 
-func (t *TaskQ) process(ctx context.Context, it *itask) {
-	it.status = InProgress
-	err := it.task.Do(ctx)
+func (t *TaskQ) process(ctx context.Context, task Task) {
+	err := task.Do(ctx)
 	if err != nil {
-		it.status = Failed
-		if event, ok := it.task.(TaskOnError); ok && event != nil {
-			event.OnError(ctx, it.id, err)
-		}
-		if t.TaskFailed != nil {
-			t.TaskFailed(it.id, it.task, err)
+		if event, ok := task.(TaskOnError); ok && event != nil {
+			event.OnError(ctx, err)
 		}
 		return
 	}
 
-	it.status = Done
-	if event, ok := it.task.(TaskDone); ok && event != nil {
-		event.Done(ctx, it.id)
-	}
-	if t.TaskDone != nil {
-		t.TaskDone(it.id, it.task)
+	if event, ok := task.(TaskDone); ok && event != nil {
+		event.Done(ctx)
 	}
 }
 
