@@ -6,7 +6,7 @@ import (
 )
 
 type TaskQInterface interface {
-	Enqueue(Task) int64
+	Enqueue(context.Context, Task) (int64, error)
 	Start() error
 	Shutdown(ctx context.Context) error
 	Close() error
@@ -29,9 +29,9 @@ func ConvertToWaitGroup(taskq TaskQInterface) *WaitGroup {
 	}
 }
 
-func (wg *WaitGroup) Enqueue(task Task) int64 {
+func (wg *WaitGroup) Enqueue(ctx context.Context, task Task) (int64, error) {
 	wg.wg.Add(1)
-	return wg.TaskQInterface.Enqueue(TaskFunc(func(ctx context.Context) error {
+	return wg.TaskQInterface.Enqueue(ctx, TaskFunc(func(ctx context.Context) error {
 		err := task.Do(ctx)
 		wg.wg.Done()
 		return err

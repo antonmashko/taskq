@@ -44,7 +44,7 @@ func TestNewTaskQNumCPUOk(t *testing.T) {
 
 func TestEnqueueNilTaskErr(t *testing.T) {
 	tq := New(1)
-	if tq.Enqueue(nil) != -1 {
+	if id, err := tq.Enqueue(context.Background(), nil); err == nil || id != -1 {
 		t.Fail()
 	}
 }
@@ -54,7 +54,7 @@ func TestEnqueueTaskOk(t *testing.T) {
 	var wg sync.WaitGroup
 	var i int32
 	wg.Add(1)
-	tq.Enqueue(TaskFunc(func(ctx context.Context) error {
+	tq.Enqueue(context.Background(), TaskFunc(func(ctx context.Context) error {
 		atomic.AddInt32(&i, 1)
 		wg.Done()
 		return nil
@@ -74,10 +74,13 @@ func TestEnqueueUniqueIDOk(t *testing.T) {
 	const count = 100
 	wg.Add(count)
 	for i := 0; i < count; i++ {
-		id := tq.Enqueue(TaskFunc(func(ctx context.Context) error {
+		id, err := tq.Enqueue(context.Background(), TaskFunc(func(ctx context.Context) error {
 			wg.Done()
 			return nil
 		}))
+		if err != nil {
+			t.Fatalf("failed to enqueue. err=%v", err)
+		}
 		if _, ok := unique[id]; ok {
 			t.Fail()
 		} else {
@@ -150,7 +153,7 @@ func TestTaskDoneEvent(t *testing.T) {
 
 	tq := New(1)
 	tq.Start()
-	tq.Enqueue(tt)
+	tq.Enqueue(context.Background(), tt)
 
 	if res := <-rch; !res {
 		t.Fail()
@@ -172,7 +175,7 @@ func TestTaskOnErrorEvent(t *testing.T) {
 
 	tq := New(1)
 	tq.Start()
-	tq.Enqueue(tt)
+	tq.Enqueue(context.Background(), tt)
 
 	if tErr := <-rch; tErr != err {
 		t.Fail()

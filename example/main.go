@@ -23,7 +23,8 @@ func main() {
 	tq := taskq.New(0)
 	tq.Start()
 	for i := 0; i < 1000; i++ {
-		log.Print("added task with id:", tq.Enqueue(&printer{}))
+		id, err := tq.Enqueue(context.Background(), &printer{})
+		log.Printf("added task with id: %d; err=%v\n", id, err)
 	}
 	tq.Close()
 	time.Sleep(time.Second)

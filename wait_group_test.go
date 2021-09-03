@@ -10,7 +10,7 @@ func TestWaitGroupEnqueue(t *testing.T) {
 	wg := NewWaitGroup(0)
 	var result int64
 	for i := 0; i < 100; i++ {
-		wg.Enqueue(TaskFunc(func(ctx context.Context) error {
+		wg.Enqueue(context.Background(), TaskFunc(func(ctx context.Context) error {
 			atomic.AddInt64(&result, 1)
 			return nil
 		}))
@@ -20,17 +20,5 @@ func TestWaitGroupEnqueue(t *testing.T) {
 
 	if result != 100 {
 		t.Fatal("invalid result number")
-	}
-}
-
-func TestConvertToWaitGroup(t *testing.T) {
-	wg := ConvertToWaitGroup(New(0))
-	if wg == nil {
-		t.Fatal("failed to convert taskq to waitgroup")
-	}
-
-	wg = ConvertToWaitGroup(NewTaskManger(New(0)))
-	if wg == nil {
-		t.Fatal("failed to convert taskq to waitgroup")
 	}
 }

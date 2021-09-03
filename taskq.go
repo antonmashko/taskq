@@ -2,10 +2,16 @@ package taskq
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"runtime"
 	"sync/atomic"
 	"time"
+)
+
+var (
+	ErrClosed  = errors.New("taskq closed")
+	ErrNilTask = errors.New("nil task")
 )
 
 type Status byte
@@ -22,6 +28,12 @@ type itask struct {
 	id     int64
 	status Status
 	task   Task
+
+	ctx context.Context
+}
+
+func (t *itask) Context() context.Context {
+	return t.ctx
 }
 
 func (t *itask) Do(ctx context.Context) error {
@@ -58,28 +70,12 @@ func (w *worker) setStatus(s workerStatus) {
 	atomic.StoreInt32((*int32)(&w.status), int32(s))
 }
 
-type adaptedQueue struct {
-	Queue
-}
-
-func (q *adaptedQueue) enqueue(it *itask) {
-	q.Queue.Enqueue(it)
-}
-
-func (q *adaptedQueue) dequeue() *itask {
-	t := q.Queue.Dequeue()
-	if t == nil {
-		return nil
-	}
-	return t.(*itask)
-}
-
 type TaskQ struct {
 	lastInc int64
 
 	closed     int32
 	hasUpdates chan struct{}
-	pending    *adaptedQueue
+	pending    Queue
 
 	workers []*worker
 
@@ -98,30 +94,24 @@ func NewWithQueue(size int, q Queue) *TaskQ {
 	return &TaskQ{
 		hasUpdates: make(chan struct{}, size),
 		workers:    make([]*worker, size),
-		pending:    &adaptedQueue{Queue: q},
+		pending:    q,
 	}
 }
 
-func (t *TaskQ) enqueue(task Task) *itask {
-	if atomic.LoadInt32(&t.closed) != 0 || task == nil {
-		return nil
+func (t *TaskQ) Enqueue(ctx context.Context, task Task) (int64, error) {
+	if atomic.LoadInt32(&t.closed) != 0 {
+		return -1, ErrClosed
 	}
-	it := &itask{
-		id:     atomic.AddInt64(&t.lastInc, 1),
-		status: Pending,
-		task:   task,
+	if task == nil {
+		return -1, ErrNilTask
 	}
-	t.pending.enqueue(it)
+
+	id, err := t.pending.Enqueue(ctx, task)
+	if err != nil {
+		return -1, err
+	}
 	t.triggerUpdateNotification()
-	return it
-}
-
-func (t *TaskQ) Enqueue(task Task) int64 {
-	it := t.enqueue(task)
-	if it == nil {
-		return -1
-	}
-	return it.id
+	return id, nil
 }
 
 func (t *TaskQ) triggerUpdateNotification() bool {
@@ -161,13 +151,22 @@ func (t *TaskQ) Start() error {
 					}
 					w.setStatus(live)
 					for {
-						task := t.pending.dequeue()
-						if task == nil {
-							break
+						task, err := t.pending.Dequeue(ctx)
+						if err != nil {
+							if err == EmptyQueue {
+								break
+							}
 						}
+
+						it := &itask{
+							status: Pending,
+							task:   task,
+							ctx:    ctx,
+						}
+
 						// if some of workers in idle state we will trigger it for processing tasks from queue
 						t.triggerUpdateNotification()
-						t.process(ctx, task)
+						t.process(ctx, it)
 					}
 				}
 			}

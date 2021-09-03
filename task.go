@@ -12,6 +12,10 @@ type Task interface {
 	Do(ctx context.Context) error
 }
 
+type TaskContext interface {
+	Context() context.Context
+}
+
 type TaskDone interface {
 	Done(context.Context, int64)
 }
