@@ -43,6 +43,8 @@ type TaskQ struct {
 	pending    Queue
 
 	workers []*worker
+
+	OnDequeueError func(ctx context.Context, workerID int, err error)
 }
 
 func New(size int) *TaskQ {
@@ -115,9 +117,10 @@ func (t *TaskQ) Start() error {
 					for {
 						task, err := t.pending.Dequeue(ctx)
 						if err != nil {
-							if err == EmptyQueue {
-								break
+							if err != EmptyQueue && t.OnDequeueError != nil {
+								t.OnDequeueError(ctx, w.id, err)
 							}
+							break
 						}
 
 						// if some of workers in idle state we will trigger it for processing tasks from queue
