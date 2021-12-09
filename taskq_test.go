@@ -139,3 +139,56 @@ func TestTaskOnErrorEvent(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestGracefulShutdown(t *testing.T) {
+	res := int32(0)
+	tq := New(10)
+	tf := TaskFunc(func(ctx context.Context) error {
+		time.Sleep(35 * time.Millisecond)
+		atomic.AddInt32(&res, 1)
+		return nil
+	})
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+	expected := 100
+	for i := 0; i < expected; i++ {
+		if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+			panic(err)
+		}
+	}
+	if err := tq.Close(); err != nil {
+		panic(err)
+	}
+
+	if res != int32(expected) {
+		t.Fail()
+	}
+}
+
+func TestGracefulShutdownWithTimeout(t *testing.T) {
+	var result bool
+	tq := New(10)
+	tf := TaskFunc(func(ctx context.Context) error {
+		time.Sleep(10 * time.Second)
+		result = true
+		return nil
+	})
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+
+	if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+		panic(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	if err := tq.Shutdown(ctx); err != nil && err != context.DeadlineExceeded {
+		panic(err)
+	}
+
+	if result {
+		t.Fail()
+	}
+}

@@ -24,7 +24,7 @@ type ConcurrentQueue struct {
 	queue   []Task
 }
 
-func NewConcurrentQueue() Queue {
+func NewConcurrentQueue() *ConcurrentQueue {
 	return &ConcurrentQueue{}
 }
 
@@ -50,12 +50,16 @@ func (q *ConcurrentQueue) Dequeue(_ context.Context) (Task, error) {
 	return it, nil
 }
 
+func (q *ConcurrentQueue) Len(_ context.Context) int {
+	return len(q.queue)
+}
+
 type LimitedConcurrentQueue struct {
 	lastInc int64
 	ch      chan Task
 }
 
-func NewLimitedConcurrentQueue(size int) Queue {
+func NewLimitedConcurrentQueue(size int) *LimitedConcurrentQueue {
 	return &LimitedConcurrentQueue{ch: make(chan Task, size)}
 }
 
@@ -74,4 +78,8 @@ func (q *LimitedConcurrentQueue) Dequeue(ctx context.Context) (Task, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+func (q *LimitedConcurrentQueue) Len(_ context.Context) int {
+	return len(q.ch)
 }

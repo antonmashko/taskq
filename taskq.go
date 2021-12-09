@@ -3,7 +3,6 @@ package taskq
 import (
 	"context"
 	"errors"
-	"net/http"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -160,8 +159,6 @@ func (t *TaskQ) Shutdown(ctx context.Context) error {
 	for _, worker := range t.workers {
 		worker.stop()
 	}
-	srv := http.Server{}
-	srv.Shutdown(ctx)
 
 	timer := time.NewTimer(pollDuration)
 	for {
