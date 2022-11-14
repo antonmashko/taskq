@@ -3,7 +3,6 @@ package taskq
 import (
 	"context"
 	"errors"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,7 +16,7 @@ func TestNewTaskQOk(t *testing.T) {
 }
 
 func TestNewTaskQNumCPUOk(t *testing.T) {
-	if tq := New(0); tq == nil || len(tq.workers) != runtime.NumCPU() {
+	if tq := New(0); tq == nil {
 		t.Fail()
 	}
 }
@@ -40,7 +39,7 @@ func TestEnqueueTaskOk(t *testing.T) {
 		return nil
 	}))
 	tq.Start()
-	tq.Close()
+	tq.Shutdown(ContextWithWait)
 	wg.Wait()
 	if i != 1 {
 		t.Fail()
@@ -140,7 +139,7 @@ func TestTaskOnErrorEvent(t *testing.T) {
 	}
 }
 
-func TestGracefulShutdown(t *testing.T) {
+func TestGracefulShutdownWithWait(t *testing.T) {
 	res := int32(0)
 	tq := New(10)
 	tf := TaskFunc(func(ctx context.Context) error {
@@ -157,11 +156,40 @@ func TestGracefulShutdown(t *testing.T) {
 			panic(err)
 		}
 	}
-	if err := tq.Close(); err != nil {
+	if err := tq.Shutdown(ContextWithWait); err != nil {
 		panic(err)
 	}
 
 	if res != int32(expected) {
+		t.Fail()
+	}
+}
+
+func TestGracefulShutdownWithoutWait(t *testing.T) {
+	res := int32(0)
+	tq := New(10)
+	tf := TaskFunc(func(ctx context.Context) error {
+		time.Sleep(2 * time.Second)
+		atomic.AddInt32(&res, 1)
+		return nil
+	})
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+
+	expected := 100
+	for i := 0; i < expected; i++ {
+		if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+			panic(err)
+		}
+	}
+	if err := tq.Close(); err != nil {
+		panic(err)
+	}
+
+	// taskq should not complete all tasks from
+	// if result equal to expected than graceful should working incorrect
+	if res == int32(expected) {
 		t.Fail()
 	}
 }
