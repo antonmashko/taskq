@@ -22,7 +22,9 @@ var (
 type taskManager interface {
 	// Len return number of requires workers
 	Len() int
+	// Run task from queue
 	Run(context.Context, Task)
+	// Shutdown finish active tasks and dispose workers
 	Shutdown(context.Context) error
 }
 
@@ -61,19 +63,30 @@ func newWithTypeAndQueue(size int, tp taskqType, q Queue) *TaskQ {
 	var tm taskManager
 	switch tp {
 	case pool:
-		tm = newWorkersPool(size)
+		tm = newWorkerPool(size)
 	default:
-		tm = newWorkersSpawner(size)
+		tm = newWorkerSpawner(size)
 	}
 	return &TaskQ{
-		taskManager:    tm,
-		queue:          q,
-		isRunning:      0,
-		isClosing:      0,
-		isStopped:      0,
-		workers:        make([]*worker, tm.Len()),
-		update:         make(chan struct{}, tm.Len()),
+		taskManager: tm,
+		queue:       q,
+		isRunning:   0,
+		isClosing:   0,
+		isStopped:   0,
+		workers:     make([]*worker, tm.Len()),
+		// update channel should always have length more than the workers count for avoiding deadlock
+		update:         make(chan struct{}, tm.Len()+1),
 		OnDequeueError: nil,
+	}
+}
+
+func (t *TaskQ) triggerDequeue() bool {
+	// notify worker about pending task (without blocking)
+	select {
+	case t.update <- struct{}{}:
+		return true
+	default:
+		return false
 	}
 }
 
@@ -91,11 +104,7 @@ func (t *TaskQ) Enqueue(ctx context.Context, task Task) (int64, error) {
 		return -1, err
 	}
 
-	// notify worker about pending task (without blocking)
-	select {
-	case t.update <- struct{}{}:
-	default:
-	}
+	t.triggerDequeue()
 	return id, nil
 }
 
@@ -114,6 +123,8 @@ func (t *TaskQ) Start() error {
 		}
 
 		go func(ctx context.Context, w *worker) {
+			// Triggering dequeue in case if Taskq was created with not empty queue
+			t.triggerDequeue()
 			for {
 				w.setStatus(idle)
 				select {

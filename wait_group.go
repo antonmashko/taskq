@@ -1,36 +1,26 @@
 package taskq
 
-import (
-	"context"
-	"sync"
-)
+import "context"
 
 type WaitGroup struct {
-	*TaskQ
-	wg sync.WaitGroup
+	tq *TaskQ
 }
 
 func NewWaitGroup(size int) *WaitGroup {
+	tq := New(size)
+	err := tq.Start()
+	if err != nil {
+		panic(err)
+	}
 	return &WaitGroup{
-		TaskQ: New(size),
+		tq: tq,
 	}
 }
 
-func NewWaitGroupFromTaskq(taskq *TaskQ) *WaitGroup {
-	return &WaitGroup{
-		TaskQ: taskq,
-	}
-}
-
-func (wg *WaitGroup) Enqueue(ctx context.Context, task Task) (int64, error) {
-	wg.wg.Add(1)
-	return wg.TaskQ.Enqueue(ctx, TaskFunc(func(ctx context.Context) error {
-		err := task.Do(ctx)
-		wg.wg.Done()
-		return err
-	}))
+func (wg *WaitGroup) Enqueue(ctx context.Context, t Task) (int64, error) {
+	return wg.tq.Enqueue(ctx, t)
 }
 
 func (wg *WaitGroup) Wait() {
-	wg.wg.Wait()
+	wg.tq.Shutdown(ContextWithWait)
 }

@@ -7,29 +7,29 @@ import (
 	"time"
 )
 
-type workersSpawner struct {
+type workerSpawner struct {
 	lock          sync.Mutex
 	workerCounter uint64
 	limitCh       chan struct{}
 	workers       map[uint64]*worker
 }
 
-func newWorkersSpawner(limit int) *workersSpawner {
+func newWorkerSpawner(limit int) *workerSpawner {
 	var limitCh chan struct{}
 	if limit > 0 {
 		limitCh = make(chan struct{}, limit)
 	}
-	return &workersSpawner{
+	return &workerSpawner{
 		workers: make(map[uint64]*worker),
 		limitCh: limitCh,
 	}
 }
 
-func (ws *workersSpawner) Len() int {
+func (ws *workerSpawner) Len() int {
 	return 2
 }
 
-func (ws *workersSpawner) Run(ctx context.Context, t Task) {
+func (ws *workerSpawner) Run(ctx context.Context, t Task) {
 	innerCtx, cancel := context.WithCancel(ctx)
 	w := &worker{
 		status: registered,
@@ -66,7 +66,7 @@ func (ws *workersSpawner) Run(ctx context.Context, t Task) {
 	}(innerCtx, w, t)
 }
 
-func (ws *workersSpawner) Shutdown(ctx context.Context) error {
+func (ws *workerSpawner) Shutdown(ctx context.Context) error {
 	var pollDuration = time.Millisecond * 500
 	timer := time.NewTimer(pollDuration)
 	var exit bool

@@ -15,7 +15,6 @@ func TestWaitGroupEnqueue(t *testing.T) {
 			return nil
 		}))
 	}
-	wg.Start()
 	wg.Wait()
 
 	if result != 100 {

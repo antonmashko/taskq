@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"sync/atomic"
-	"time"
 
 	"github.com/antonmashko/taskq"
 )
@@ -26,6 +25,6 @@ func main() {
 		id, err := tq.Enqueue(context.Background(), &printer{})
 		log.Printf("added task with id: %d; err=%v\n", id, err)
 	}
-	tq.Close()
-	time.Sleep(time.Second)
+	tq.Shutdown(taskq.ContextWithWait)
+	log.Println("Result:", counter)
 }
