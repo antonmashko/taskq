@@ -4,4 +4,6 @@ import "context"
 
 type ctxWaitKey struct{}
 
-var ContextWithWait = context.WithValue(context.Background(), ctxWaitKey{}, true)
+func ContextWithWait(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxWaitKey{}, true)
+}

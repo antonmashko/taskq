@@ -27,7 +27,7 @@ func TestGracefulShutdownWithWait(t *testing.T) {
 			panic(err)
 		}
 	}
-	if err := tq.Shutdown(taskq.ContextWithWait); err != nil {
+	if err := tq.Shutdown(taskq.ContextWithWait(context.Background())); err != nil {
 		panic(err)
 	}
 
@@ -53,7 +53,7 @@ func TestPoolGracefulShutdownWithWait(t *testing.T) {
 			panic(err)
 		}
 	}
-	if err := tq.Shutdown(taskq.ContextWithWait); err != nil {
+	if err := tq.Shutdown(taskq.ContextWithWait(context.Background())); err != nil {
 		panic(err)
 	}
 
