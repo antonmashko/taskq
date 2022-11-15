@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
+	"time"
 )
 
-type TaskqType byte
+type taskqType byte
 
 const (
-	Pool TaskqType = iota + 1
-	Spawn
+	pool taskqType = iota + 1
+	spawn
 )
 
 var (
@@ -18,45 +19,61 @@ var (
 	ErrNilTask = errors.New("nil task")
 )
 
-type workersManager interface {
-	Enqueue(Task) bool
-	Start(context.Context)
+type taskManager interface {
+	// Len return number of requires workers
+	Len() int
+	Run(context.Context, Task)
 	Shutdown(context.Context) error
 }
 
 type TaskQ struct {
 	queue Queue
 
-	isRunning      int32
-	closed         int32
-	workersManager workersManager
+	isRunning int32
+	isClosing int32
+	isStopped int32
 
-	OnDequeueError func(ctx context.Context, workerID int, err error)
+	OnDequeueError func(ctx context.Context, workerID uint64, err error)
+
+	taskManager taskManager
+	// workers
+	workers []*worker
+	update  chan struct{}
 }
 
-func New(size int) *TaskQ {
-	return NewWithQueue(size, NewConcurrentQueue())
+func New(limit int) *TaskQ {
+	return NewWithQueue(limit, NewConcurrentQueue())
 }
 
-func NewWithType(size int, tp TaskqType) *TaskQ {
-	return NewWithTypeAndQueue(size, tp, NewConcurrentQueue())
+func NewWithQueue(limit int, q Queue) *TaskQ {
+	return newWithTypeAndQueue(limit, spawn, q)
 }
 
-func NewWithQueue(size int, q Queue) *TaskQ {
-	return NewWithTypeAndQueue(size, Spawn, q)
+func Pool(size int) *TaskQ {
+	return PoolWithQueue(size, NewConcurrentQueue())
 }
 
-func NewWithTypeAndQueue(size int, tp TaskqType, q Queue) *TaskQ {
-	var workersManager workersManager
+func PoolWithQueue(size int, q Queue) *TaskQ {
+	return newWithTypeAndQueue(size, pool, q)
+}
+
+func newWithTypeAndQueue(size int, tp taskqType, q Queue) *TaskQ {
+	var tm taskManager
 	switch tp {
-	case Pool:
-		workersManager = newWorkersPool(size, q)
+	case pool:
+		tm = newWorkersPool(size)
 	default:
-		workersManager = newWorkersSpawner(size, q)
+		tm = newWorkersSpawner(size)
 	}
 	return &TaskQ{
-		workersManager: workersManager,
+		taskManager:    tm,
 		queue:          q,
+		isRunning:      0,
+		isClosing:      0,
+		isStopped:      0,
+		workers:        make([]*worker, tm.Len()),
+		update:         make(chan struct{}, tm.Len()),
+		OnDequeueError: nil,
 	}
 }
 
@@ -65,7 +82,7 @@ func (t *TaskQ) Enqueue(ctx context.Context, task Task) (int64, error) {
 		return -1, ErrNilTask
 	}
 
-	if atomic.LoadInt32(&t.closed) != 0 {
+	if atomic.LoadInt32(&t.isClosing) != 0 {
 		return -1, ErrClosed
 	}
 
@@ -74,7 +91,11 @@ func (t *TaskQ) Enqueue(ctx context.Context, task Task) (int64, error) {
 		return -1, err
 	}
 
-	t.workersManager.Enqueue(task)
+	// notify worker about pending task (without blocking)
+	select {
+	case t.update <- struct{}{}:
+	default:
+	}
 	return id, nil
 }
 
@@ -82,16 +103,105 @@ func (t *TaskQ) Start() error {
 	if !atomic.CompareAndSwapInt32(&t.isRunning, 0, 1) {
 		return errors.New("taskq is running")
 	}
+
 	ctx := context.Background()
-	t.workersManager.Start(ctx)
+	for i := range t.workers {
+		innerCtx, cancel := context.WithCancel(ctx)
+		t.workers[i] = &worker{
+			id:     uint64(i),
+			status: registered,
+			stop:   cancel,
+		}
+
+		go func(ctx context.Context, w *worker) {
+			for {
+				w.setStatus(idle)
+				select {
+				case <-ctx.Done():
+					w.setStatus(stopped)
+					return
+				case <-t.update:
+					w.setStatus(live)
+					for atomic.LoadInt32(&t.isStopped) != 1 {
+						task, err := t.queue.Dequeue(ctx)
+						if err != nil {
+							if err == EmptyQueue {
+								break
+							}
+							if t.OnDequeueError == nil {
+								panic(err)
+							}
+
+							t.OnDequeueError(ctx, w.id, err)
+							break
+						}
+						t.taskManager.Run(ctx, task)
+					}
+				}
+			}
+		}(innerCtx, t.workers[i])
+	}
+
+	var ready bool
+	for !ready {
+		ready = true
+		for _, w := range t.workers {
+			if w.isStatus(registered) {
+				ready = false
+				break
+			}
+		}
+	}
+
 	return nil
 }
 
 func (t *TaskQ) Shutdown(ctx context.Context) error {
-	if !atomic.CompareAndSwapInt32(&t.closed, 0, 1) {
+	if !atomic.CompareAndSwapInt32(&t.isClosing, 0, 1) {
 		return errors.New("taskq is closing")
 	}
-	return t.workersManager.Shutdown(ctx)
+
+	defer close(t.update)
+	if wait, ok := ctx.Value(ctxWaitKey{}).(bool); !ok || !wait {
+		atomic.StoreInt32(&t.isStopped, 1)
+	}
+
+	err := t.taskManager.Shutdown(ctx)
+	if err != nil {
+		return err
+	}
+
+	var pollDuration = time.Millisecond * 500
+	timer := time.NewTimer(pollDuration)
+	for {
+		// checking if we still have active workers
+		hasActive := false
+		for _, w := range t.workers {
+			if w.isStatus(live) {
+				hasActive = true
+				break
+			}
+		}
+
+		if !hasActive {
+			for _, w := range t.workers {
+				w.stop()
+				if !w.isStatus(stopped) {
+					hasActive = true
+					break
+				}
+			}
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+			const delta = 1.1
+			timer.Reset(time.Duration(float64(pollDuration) * delta))
+		}
+	}
 }
 
 func (t *TaskQ) Close() error {
