@@ -25,6 +25,6 @@ func main() {
 		id, err := tq.Enqueue(context.Background(), &printer{})
 		log.Printf("added task with id: %d; err=%v\n", id, err)
 	}
-	tq.Shutdown(taskq.ContextWithWait)
+	tq.Shutdown(taskq.ContextWithWait(context.Background()))
 	log.Println("Result:", counter)
 }
