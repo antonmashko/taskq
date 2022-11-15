@@ -22,5 +22,5 @@ func (wg *WaitGroup) Enqueue(ctx context.Context, t Task) (int64, error) {
 }
 
 func (wg *WaitGroup) Wait() {
-	wg.tq.Shutdown(ContextWithWait)
+	wg.tq.Shutdown(ContextWithWait(context.Background()))
 }
