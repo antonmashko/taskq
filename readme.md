@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/antonmashko/taskq.svg)](https://travis-ci.org/antonmashko/taskq)
 [![Codecov](https://img.shields.io/codecov/c/github/antonmashko/taskq.svg)](https://codecov.io/gh/antonmashko/taskq)
 
-Simple and powerful goroutines manager.
+Simple and powerful goroutine manager.
 
 ---
 ## Installing 
