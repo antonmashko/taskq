@@ -1,0 +1,189 @@
+package taskq_test
+
+import (
+	"context"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/antonmashko/taskq"
+)
+
+func TestGracefulShutdownWithWait(t *testing.T) {
+	res := int32(0)
+	tq := taskq.New(0)
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+
+	tf := taskq.TaskFunc(func(ctx context.Context) error {
+		time.Sleep(35 * time.Millisecond)
+		atomic.AddInt32(&res, 1)
+		return nil
+	})
+	expected := 100
+	for i := 0; i < expected; i++ {
+		if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+			panic(err)
+		}
+	}
+	if err := tq.Shutdown(taskq.ContextWithWait); err != nil {
+		panic(err)
+	}
+
+	if res != int32(expected) {
+		t.Fail()
+	}
+}
+
+func TestPoolGracefulShutdownWithWait(t *testing.T) {
+	res := int32(0)
+	tq := taskq.Pool(0)
+	tf := taskq.TaskFunc(func(ctx context.Context) error {
+		time.Sleep(35 * time.Millisecond)
+		atomic.AddInt32(&res, 1)
+		return nil
+	})
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+	expected := 100
+	for i := 0; i < expected; i++ {
+		if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+			panic(err)
+		}
+	}
+	if err := tq.Shutdown(taskq.ContextWithWait); err != nil {
+		panic(err)
+	}
+
+	if res != int32(expected) {
+		t.Fail()
+	}
+}
+
+func TestGracefulShutdownWithoutWait(t *testing.T) {
+	res := int32(0)
+	tq := taskq.New(10)
+	tf := taskq.TaskFunc(func(ctx context.Context) error {
+		time.Sleep(2 * time.Second)
+		atomic.AddInt32(&res, 1)
+		return nil
+	})
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+
+	expected := 100
+	for i := 0; i < expected; i++ {
+		if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+			panic(err)
+		}
+	}
+	if err := tq.Close(); err != nil {
+		panic(err)
+	}
+
+	// taskq should not complete all tasks from
+	// if result equal to expected than graceful should working incorrect
+	if res == int32(expected) {
+		t.Fail()
+	}
+}
+
+func TestPoolGracefulShutdownWithoutWait(t *testing.T) {
+	res := int32(0)
+	tq := taskq.Pool(10)
+	tf := taskq.TaskFunc(func(ctx context.Context) error {
+		time.Sleep(2 * time.Second)
+		atomic.AddInt32(&res, 1)
+		return nil
+	})
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+
+	expected := 100
+	for i := 0; i < expected; i++ {
+		if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+			panic(err)
+		}
+	}
+	if err := tq.Close(); err != nil {
+		panic(err)
+	}
+
+	// taskq should not complete all tasks from
+	// if result equal to expected than graceful should working incorrect
+	if res == int32(expected) {
+		t.Fail()
+	}
+}
+
+func TestGracefulShutdownWithTimeout(t *testing.T) {
+	var result bool
+	tq := taskq.New(10)
+	ch := make(chan struct{})
+	tf := taskq.TaskFunc(func(ctx context.Context) error {
+		ch <- struct{}{}
+		time.Sleep(10 * time.Second)
+		result = true
+		return nil
+	})
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+	if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+		panic(err)
+	}
+	<-ch
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := tq.Shutdown(ctx)
+	if err == nil {
+		t.Fatal("Shutdown return nil err")
+	}
+
+	if err != context.DeadlineExceeded {
+		t.Fatalf("invalid error. expected: %T actual %T", err, context.DeadlineExceeded)
+	}
+
+	if result {
+		t.Fail()
+	}
+}
+
+func TestPoolGracefulShutdownWithTimeout(t *testing.T) {
+	var result bool
+	tq := taskq.Pool(10)
+	ch := make(chan struct{})
+	tf := taskq.TaskFunc(func(ctx context.Context) error {
+		ch <- struct{}{}
+		time.Sleep(10 * time.Second)
+		result = true
+		return nil
+	})
+	if err := tq.Start(); err != nil {
+		panic(err)
+	}
+	if _, err := tq.Enqueue(context.Background(), tf); err != nil {
+		panic(err)
+	}
+	<-ch
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	err := tq.Shutdown(ctx)
+	if err == nil {
+		t.Fatal("Shutdown return nil err")
+	}
+
+	if err != context.DeadlineExceeded {
+		t.Fatalf("invalid error. expected: %T actual %T", err, context.DeadlineExceeded)
+	}
+
+	if result {
+		t.Fail()
+	}
+}

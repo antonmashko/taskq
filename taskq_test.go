@@ -1,77 +1,13 @@
-package taskq
+package taskq_test
 
 import (
 	"context"
-	"errors"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
+
+	"github.com/antonmashko/taskq"
 )
-
-func TestNewTaskQOk(t *testing.T) {
-	if tq := New(1); tq == nil {
-		t.Fail()
-	}
-}
-
-func TestNewTaskQNumCPUOk(t *testing.T) {
-	if tq := New(0); tq == nil || len(tq.workers) != runtime.NumCPU() {
-		t.Fail()
-	}
-}
-
-func TestEnqueueNilTaskErr(t *testing.T) {
-	tq := New(1)
-	if id, err := tq.Enqueue(context.Background(), nil); err == nil || id != -1 {
-		t.Fail()
-	}
-}
-
-func TestEnqueueTaskOk(t *testing.T) {
-	tq := New(1)
-	var wg sync.WaitGroup
-	var i int32
-	wg.Add(1)
-	tq.Enqueue(context.Background(), TaskFunc(func(ctx context.Context) error {
-		atomic.AddInt32(&i, 1)
-		wg.Done()
-		return nil
-	}))
-	tq.Start()
-	tq.Close()
-	wg.Wait()
-	if i != 1 {
-		t.Fail()
-	}
-}
-
-func TestEnqueueUniqueIDOk(t *testing.T) {
-	tq := New(1)
-	var wg sync.WaitGroup
-	unique := make(map[int64]struct{})
-	const count = 100
-	wg.Add(count)
-	for i := 0; i < count; i++ {
-		id, err := tq.Enqueue(context.Background(), TaskFunc(func(ctx context.Context) error {
-			wg.Done()
-			return nil
-		}))
-		if err != nil {
-			t.Fatalf("failed to enqueue. err=%v", err)
-		}
-		if _, ok := unique[id]; ok {
-			t.Fail()
-		} else {
-			unique[id] = struct{}{}
-		}
-	}
-
-	tq.Start()
-	wg.Wait()
-	tq.Close()
-}
 
 type testTask struct {
 	fOnError func(context.Context, error)
@@ -92,103 +28,110 @@ func (t *testTask) Do(_ context.Context) error {
 	return t.resultErr
 }
 
-func TestTaskDoneEvent(t *testing.T) {
-	rch := make(chan bool)
-	tt := &testTask{
-		fdone: func(ctx context.Context) {
-			rch <- true
-		},
-	}
-
-	tq := New(1)
-	tq.Start()
-	tq.Enqueue(context.Background(), tt)
-
-	select {
-	case <-rch:
-		break
-	case <-time.After(time.Second):
-		t.Fail()
-	}
-}
-
-func TestTaskOnErrorEvent(t *testing.T) {
-	rch := make(chan error)
-	err := errors.New("task failed")
-	tt := &testTask{
-		resultErr: err,
-		fOnError: func(c context.Context, e error) {
-			rch <- e
-		},
-		fdone: func(ctx context.Context) {
-			panic("done event invoked")
-		},
-	}
-
-	tq := New(1)
-	tq.Start()
-	tq.Enqueue(context.Background(), tt)
-
-	select {
-	case tErr := <-rch:
-		if tErr != err {
-			t.Fail()
-		}
-		break
-	case <-time.After(time.Second):
-		t.Fail()
-	}
-}
-
-func TestGracefulShutdown(t *testing.T) {
-	res := int32(0)
-	tq := New(10)
-	tf := TaskFunc(func(ctx context.Context) error {
-		time.Sleep(35 * time.Millisecond)
-		atomic.AddInt32(&res, 1)
-		return nil
-	})
+func TestTaskqStartNoError_Ok(t *testing.T) {
+	tq := taskq.New(0)
 	if err := tq.Start(); err != nil {
-		panic(err)
+		t.Fail()
 	}
-	expected := 100
-	for i := 0; i < expected; i++ {
-		if _, err := tq.Enqueue(context.Background(), tf); err != nil {
-			panic(err)
+}
+
+func TestTaskqDoubleStart_Err(t *testing.T) {
+	tq := taskq.New(0)
+	if err := tq.Start(); err != nil {
+		t.Fail()
+	}
+	if err := tq.Start(); err == nil {
+		t.Fail()
+	}
+}
+
+func TestTaskqStartOnNotEmptyQueue_Ok(t *testing.T) {
+	q := taskq.NewConcurrentQueue()
+	var wg sync.WaitGroup
+	const count = 100
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		_, err := q.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+			wg.Done()
+			return nil
+		}))
+		if err != nil {
+			t.Fatalf("got error on enqueue. err:%s", err)
 		}
 	}
-	if err := tq.Close(); err != nil {
-		panic(err)
-	}
 
-	if res != int32(expected) {
-		t.Fail()
+	tq := taskq.NewWithQueue(0, q)
+	tq.Start()
+	wg.Wait()
+}
+
+func TestPoolStartOnNotEmptyQueue_Ok(t *testing.T) {
+	q := taskq.NewConcurrentQueue()
+	var wg sync.WaitGroup
+	const count = 100
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		_, err := q.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+			wg.Done()
+			return nil
+		}))
+		if err != nil {
+			t.Fatalf("got error on enqueue. err:%s", err)
+		}
+	}
+	tq := taskq.PoolWithQueue(0, q)
+	tq.Start()
+	wg.Wait()
+}
+
+func TestTaskqSequentialExecution_Ok(t *testing.T) {
+	tq := taskq.New(1)
+	tq.Start()
+	count := 100
+	counter := int32(0)
+	ch := make(chan int)
+	for i := 0; i < count; i++ {
+		tq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+			ch <- int(atomic.AddInt32(&counter, 1))
+			return nil
+		}))
+	}
+	tq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+		close(ch)
+		return nil
+	}))
+
+	curr := 0
+	for i := range ch {
+		curr++
+		if i != curr {
+			t.Fatalf("invalid value from channel. expected:%d actual:%d", curr, i)
+		}
 	}
 }
 
-func TestGracefulShutdownWithTimeout(t *testing.T) {
-	var result bool
-	tq := New(10)
-	tf := TaskFunc(func(ctx context.Context) error {
-		time.Sleep(10 * time.Second)
-		result = true
+func TestPoolSequentialExecution_Ok(t *testing.T) {
+	tq := taskq.Pool(1)
+	tq.Start()
+	count := 100
+	counter := int32(0)
+	ch := make(chan int)
+	for i := 0; i < count; i++ {
+		tq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+			ch <- int(atomic.AddInt32(&counter, 1))
+			return nil
+		}))
+	}
+	tq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+		close(ch)
 		return nil
-	})
-	if err := tq.Start(); err != nil {
-		panic(err)
-	}
+	}))
 
-	if _, err := tq.Enqueue(context.Background(), tf); err != nil {
-		panic(err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	if err := tq.Shutdown(ctx); err != nil && err != context.DeadlineExceeded {
-		panic(err)
-	}
-
-	if result {
-		t.Fail()
+	curr := 0
+	for i := range ch {
+		curr++
+		if i != curr {
+			t.Fatalf("invalid value from channel. expected:%d actual:%d", curr, i)
+		}
 	}
 }

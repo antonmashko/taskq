@@ -4,7 +4,7 @@
 [![Build Status](https://travis-ci.org/antonmashko/taskq.svg)](https://travis-ci.org/antonmashko/taskq)
 [![Codecov](https://img.shields.io/codecov/c/github/antonmashko/taskq.svg)](https://codecov.io/gh/antonmashko/taskq)
 
-Goroutine manager. 
+Simple and powerful goroutines manager.
 
 ---
 ## Installing 
@@ -12,21 +12,21 @@ Goroutine manager.
 go get github.com/antonmashko/taskq
 ```
 
-## TaskQ
-### Initializing
-Use TaskQ for managing you goroutines. 
+## TaskQ when and how to use
+Usually you need `TaskQ` for controlling resources of service (goroutines spawning).
+Example:
 ```golang
-taskq := New(<size>)
+taskq := New(10)
+taskq.Start()
+taskID, err := taskq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+        fmt.Println("hello world")
+		return nil
+	}))
 ```
-size - parameter will control goroutines count. In case if all goroutines are busy, task will be added to queue and will wait for a free worker (goroutine) from pool.
+In this example, we created TaskQ with limiting max active goroutines count to 10. Tasks for executing we're adding to TaskQ with `Enqueue`. Task will be executed when TaskQ will be able to create new worker (goroutine). Goroutine will dispose and next task will be executed in a new goroutine.
 
-### Add task to TaskQ
-```golang
-taskID := taskq.Enqueue(<task>)
-```
+Use `limit=0` for not limiting goroutines number.
 
-### Start TaskQ
-```golang
-err := taskq.Start()
-```
-run all added and future tasks in taskq.
+
+## Graceful shutdown
+`Shutdown` and `Close` gracefully shuts down the TaskQ without interrupting any active tasks. If TaskQ need to finish all tasks in queue, use context `ContextWithWait` with `Shutdown` method.

@@ -48,3 +48,17 @@ func (t *RetryableTask) Do(ctx context.Context) error {
 	}
 	return nil
 }
+
+func processTask(ctx context.Context, task Task) {
+	err := task.Do(ctx)
+	if err != nil {
+		if event, ok := task.(TaskOnError); ok && event != nil {
+			event.OnError(ctx, err)
+		}
+		return
+	}
+
+	if event, ok := task.(TaskDone); ok && event != nil {
+		event.Done(ctx)
+	}
+}

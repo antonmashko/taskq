@@ -1,24 +1,26 @@
-package taskq
+package taskq_test
 
 import (
 	"context"
 	"testing"
+
+	"github.com/antonmashko/taskq"
 )
 
 func TestBlockingQueueEnqueueOK(t *testing.T) {
-	q := NewConcurrentQueue()
+	q := taskq.NewConcurrentQueue()
 	for i := 0; i < 10; i++ {
 		q.Enqueue(context.Background(), &testTask{})
 	}
-	if len(q.queue) != 10 {
+	if q.Len(context.Background()) != 10 {
 		t.Fail()
 	}
 }
 
 func TestBlockingQueueDequeueOK(t *testing.T) {
-	q := NewConcurrentQueue()
+	q := taskq.NewConcurrentQueue()
 	var result int
-	t1 := TaskFunc(func(ctx context.Context) error {
+	t1 := taskq.TaskFunc(func(ctx context.Context) error {
 		result++
 		return nil
 	})
@@ -37,15 +39,15 @@ func TestBlockingQueueDequeueOK(t *testing.T) {
 }
 
 func BenchmarkBlockingQueue(b *testing.B) {
-	q := NewConcurrentQueue()
+	q := taskq.NewConcurrentQueue()
 	// q.queue = append(q.queue, &itask{})
 	for i := 0; i < b.N; i++ {
-		q.Enqueue(context.Background(), TaskFunc(func(ctx context.Context) error { return nil }))
+		q.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error { return nil }))
 		q.Dequeue(context.Background())
 	}
 }
 
 func TestTaskqQueueImplementation(t *testing.T) {
-	var _ Queue = NewConcurrentQueue()
-	var _ Queue = NewLimitedConcurrentQueue(0)
+	var _ taskq.Queue = taskq.NewConcurrentQueue()
+	var _ taskq.Queue = taskq.NewLimitedConcurrentQueue(0)
 }
