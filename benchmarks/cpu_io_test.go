@@ -22,3 +22,7 @@ func BenchmarkTaskq_SleepAndSmallJSONUnmarshalF(b *testing.B) {
 func BenchmarkSpawningGoroutines_SleepAndSmallJSONUnmarshalF(b *testing.B) {
 	SpawningGoroutinesTestF(b, SleepAndSmallJSONUnmarshalF)
 }
+
+func BenchmarkTaskqPool_SleepAndSmallJSONUnmarshalF(b *testing.B) {
+	TaskqPoolTestF(b, SleepAndSmallJSONUnmarshalF)
+}

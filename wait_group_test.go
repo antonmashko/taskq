@@ -17,7 +17,7 @@ func TestWaitGroupEnqueue(t *testing.T) {
 	}
 	wg.Wait()
 
-	if result != 100 {
+	if atomic.LoadInt64(&result) != 100 {
 		t.Fatal("invalid result number")
 	}
 }

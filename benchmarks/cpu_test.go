@@ -19,3 +19,7 @@ func BenchmarkTaskq_SmallJSONUnmarshal(b *testing.B) {
 func BenchmarkSpawningGoroutines_SmallJSONUnmarshal(b *testing.B) {
 	SpawningGoroutinesTestF(b, SmallJSONUnmarshalF)
 }
+
+func BenchmarkTaskqPool_SmallJSONUnmarshal(b *testing.B) {
+	TaskqPoolTestF(b, SmallJSONUnmarshalF)
+}

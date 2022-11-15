@@ -30,3 +30,6 @@ Use `limit=0` for not limiting goroutines number.
 
 ## Graceful shutdown
 `Shutdown` and `Close` gracefully shuts down the TaskQ without interrupting any active tasks. If TaskQ need to finish all tasks in queue, use context `ContextWithWait` with `Shutdown` method.
+
+## Benchmark results
+[Benchmarks](benchmarks/readme.md)

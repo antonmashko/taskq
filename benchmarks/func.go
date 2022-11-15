@@ -43,3 +43,23 @@ func SpawningGoroutinesTestF(b *testing.B, f func(context.Context)) {
 	}
 	wg.Wait()
 }
+
+func TaskqPoolTestF(b *testing.B, f func(context.Context)) {
+	tq := taskq.Pool(0)
+	var wg sync.WaitGroup
+	tq.Start()
+
+	b.ResetTimer()
+	wg.Add(b.N)
+
+	for i := 0; i < b.N; i++ {
+		tq.Enqueue(context.Background(),
+			taskq.TaskFunc(func(ctx context.Context) error {
+				f(ctx)
+				wg.Done()
+				return nil
+			}))
+	}
+
+	wg.Wait()
+}
