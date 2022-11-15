@@ -12,7 +12,7 @@ const (
 )
 
 type worker struct {
-	id     int
+	id     uint64
 	status workerStatus
 	stop   func()
 }

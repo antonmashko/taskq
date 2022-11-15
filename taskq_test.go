@@ -72,6 +72,17 @@ func TestEnqueueUniqueIDOk(t *testing.T) {
 	tq.Close()
 }
 
+func TestStartEnqueueOk(t *testing.T) {
+	tq := New(1)
+	tq.Start()
+	doneCh := make(chan struct{})
+	tq.Enqueue(context.Background(), TaskFunc(func(ctx context.Context) error {
+		doneCh <- struct{}{}
+		return nil
+	}))
+	<-doneCh
+}
+
 type testTask struct {
 	fOnError func(context.Context, error)
 	fdone    func(context.Context)

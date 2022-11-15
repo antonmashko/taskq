@@ -6,6 +6,13 @@ import (
 	"sync/atomic"
 )
 
+type TaskqType byte
+
+const (
+	Pool TaskqType = iota + 1
+	Spawn
+)
+
 var (
 	ErrClosed  = errors.New("taskq closed")
 	ErrNilTask = errors.New("nil task")
@@ -20,6 +27,7 @@ type workersManager interface {
 type TaskQ struct {
 	queue Queue
 
+	isRunning      int32
 	closed         int32
 	workersManager workersManager
 
@@ -30,9 +38,24 @@ func New(size int) *TaskQ {
 	return NewWithQueue(size, NewConcurrentQueue())
 }
 
+func NewWithType(size int, tp TaskqType) *TaskQ {
+	return NewWithTypeAndQueue(size, tp, NewConcurrentQueue())
+}
+
 func NewWithQueue(size int, q Queue) *TaskQ {
+	return NewWithTypeAndQueue(size, Spawn, q)
+}
+
+func NewWithTypeAndQueue(size int, tp TaskqType, q Queue) *TaskQ {
+	var workersManager workersManager
+	switch tp {
+	case Pool:
+		workersManager = newWorkersPool(size, q)
+	default:
+		workersManager = newWorkersSpawner(size, q)
+	}
 	return &TaskQ{
-		workersManager: newWorkersPool(size, q),
+		workersManager: workersManager,
 		queue:          q,
 	}
 }
@@ -56,13 +79,18 @@ func (t *TaskQ) Enqueue(ctx context.Context, task Task) (int64, error) {
 }
 
 func (t *TaskQ) Start() error {
+	if !atomic.CompareAndSwapInt32(&t.isRunning, 0, 1) {
+		return errors.New("taskq is running")
+	}
 	ctx := context.Background()
 	t.workersManager.Start(ctx)
 	return nil
 }
 
 func (t *TaskQ) Shutdown(ctx context.Context) error {
-	atomic.StoreInt32(&t.closed, 1) // no more accepting tasks
+	if !atomic.CompareAndSwapInt32(&t.closed, 0, 1) {
+		return errors.New("taskq is closing")
+	}
 	return t.workersManager.Shutdown(ctx)
 }
 

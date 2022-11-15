@@ -31,7 +31,7 @@ func (wp *workersPool) Enqueue(t Task) bool {
 	// notify worker about pending task
 	select {
 	case wp.update <- struct{}{}:
-		// we have free worker
+		// available worker
 		return true
 	default:
 		// all workers are busy
@@ -43,7 +43,7 @@ func (wp *workersPool) Start(ctx context.Context) {
 	for i := range wp.workers {
 		innerCtx, cancel := context.WithCancel(ctx)
 		wp.workers[i] = &worker{
-			id:     i,
+			id:     uint64(i),
 			status: registered,
 			stop:   cancel,
 		}
@@ -84,7 +84,7 @@ func (wp *workersPool) Start(ctx context.Context) {
 	for !ready {
 		ready = true
 		for _, w := range wp.workers {
-			if w == nil || w.isStatus(registered) {
+			if w.isStatus(registered) {
 				ready = false
 				break
 			}
