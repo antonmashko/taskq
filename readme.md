@@ -9,7 +9,7 @@ Simple and powerful goroutine manager.
 * [Installing](#installing)
 * [Purpose](#purpose)
 * [Example](#example)
-* [Persistency and Queues](#persistency-and-queues)
+* [Persistence and Queues](#persistence-and-queues)
 * [Task Events](#task-events)
 * [Benchmark results](#benchmark-results)
 
@@ -70,7 +70,7 @@ func main() {
 ```
 More examples [here](example)
 
-## Persistency and Queues
+## Persistence and Queues
 By default TaskQ stores all tasks in memory using [ConcurrencyQueue](https://pkg.go.dev/github.com/antonmashko/taskq#ConcurrentQueue). For creating custom queue you need to implement interface [Queue](https://pkg.go.dev/github.com/antonmashko/taskq#Queue) and pass it as argument on creating [NewWithQueue](https://pkg.go.dev/github.com/antonmashko/taskq#NewWithQueue) or [PoolWithQueue](https://pkg.go.dev/github.com/antonmashko/taskq#PoolWithQueue).
 See [example](example/redis-custom-queue) of how to adapt redis queue into TaskQ
 
@@ -78,7 +78,6 @@ See [example](example/redis-custom-queue) of how to adapt redis queue into TaskQ
 Task support two type of events:
 1. Done - completion of the task. https://pkg.go.dev/github.com/antonmashko/taskq#TaskDone
 2. OnError - error handling event. https://pkg.go.dev/github.com/antonmashko/taskq#TaskOnError 
-
 For invoking event implement interface on your task ([example](example/task-events)).
 
 ## Graceful shutdown
