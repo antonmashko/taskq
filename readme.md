@@ -6,6 +6,12 @@
 
 Simple and powerful goroutine manager.
 
+* [Installing](#installing)
+* [Purpose](#purpose)
+* [Example](#example)
+* [Persistency and Queues](#persistency-and-queues)
+* [Benchmark results](#benchmark-results)
+
 ---
 ## Installing 
 ```bash
@@ -61,6 +67,11 @@ func main() {
 }
 
 ```
+More examples [here](example)
+
+## Persistency and Queues
+By default TaskQ stores all tasks in memory using [ConcurrencyQueue](https://pkg.go.dev/github.com/antonmashko/taskq#ConcurrentQueue). For creating custom queue you need to implement interface [Queue](https://pkg.go.dev/github.com/antonmashko/taskq#Queue) and pass it as argument on creating [NewWithQueue](https://pkg.go.dev/github.com/antonmashko/taskq#NewWithQueue) or [PoolWithQueue](https://pkg.go.dev/github.com/antonmashko/taskq#PoolWithQueue).
+See [example](example/redis-custom-queue) of how to adapt redis queue into TaskQ
 
 ## Graceful shutdown
 [Shutdown](https://pkg.go.dev/github.com/antonmashko/taskq#TaskQ.Shutdown) and [Close](https://pkg.go.dev/github.com/antonmashko/taskq#TaskQ.Close) gracefully shuts down the TaskQ without interrupting any active tasks. If TaskQ need to finish all tasks in queue, use context [ContextWithWait](https://pkg.go.dev/github.com/antonmashko/taskq#ContextWithWait) as `Shutdown` method argument.
