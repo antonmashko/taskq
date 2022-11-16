@@ -25,6 +25,12 @@ func (t *task) OnError(ctx context.Context, err error) {
 	log.Println("[OnError] task err:", err)
 }
 
+/*
+	$ go run main.go
+	Output:
+	[Done] task result: 1
+	[OnError] task err: foo err
+*/
 func main() {
 	tq := taskq.New(0)
 	tq.Start()
