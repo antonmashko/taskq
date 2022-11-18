@@ -1,6 +1,8 @@
 package taskq
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 type workerStatus int32
 
