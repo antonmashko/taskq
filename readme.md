@@ -1,7 +1,7 @@
 # TaskQ
 [![Go Report](https://goreportcard.com/badge/github.com/antonmashko/taskq)](https://goreportcard.com/report/github.com/antonmashko/taskq)
 [![GoDoc](http://godoc.org/github.com/antonmashko/taskq?status.svg)](http://godoc.org/github.com/antonmashko/taskq)
-[![Build Status](https://github.com/antonmashko/taskq/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/antonmashko/taskq/actions/workflows/test.yml)
+[![Build Status](https://github.com/antonmashko/taskq/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/antonmashko/taskq/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/antonmashko/taskq/branch/master/graph/badge.svg?token=1URHcPC5xo)](https://codecov.io/gh/antonmashko/taskq)
 
 Simple and powerful goroutine manager.
