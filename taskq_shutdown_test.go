@@ -31,7 +31,7 @@ func TestGracefulShutdownWithWait(t *testing.T) {
 		panic(err)
 	}
 
-	if res != int32(expected) {
+	if atomic.LoadInt32(&res) != int32(expected) {
 		t.Fail()
 	}
 }
