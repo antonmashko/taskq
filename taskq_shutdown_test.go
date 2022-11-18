@@ -57,7 +57,7 @@ func TestPoolGracefulShutdownWithWait(t *testing.T) {
 		panic(err)
 	}
 
-	if res != int32(expected) {
+	if atomic.LoadInt32(&res) != int32(expected) {
 		t.Fail()
 	}
 }
@@ -86,7 +86,7 @@ func TestGracefulShutdownWithoutWait(t *testing.T) {
 
 	// taskq should not complete all tasks from
 	// if result equal to expected than graceful should working incorrect
-	if res == int32(expected) {
+	if atomic.LoadInt32(&res) == int32(expected) {
 		t.Fail()
 	}
 }
@@ -115,7 +115,7 @@ func TestPoolGracefulShutdownWithoutWait(t *testing.T) {
 
 	// taskq should not complete all tasks from
 	// if result equal to expected than graceful should working incorrect
-	if res == int32(expected) {
+	if atomic.LoadInt32(&res) == int32(expected) {
 		t.Fail()
 	}
 }
