@@ -131,7 +131,11 @@ func (t *TaskQ) Start() error {
 				case <-ctx.Done():
 					w.setStatus(stopped)
 					return
-				case <-t.update:
+				case _, ok := <-t.update:
+					if !ok {
+						w.setStatus(stopped)
+						return
+					}
 					w.setStatus(live)
 					for atomic.LoadInt32(&t.isStopped) != 1 {
 						task, err := t.queue.Dequeue(ctx)
@@ -167,14 +171,40 @@ func (t *TaskQ) Start() error {
 	return nil
 }
 
+func (t *TaskQ) hasActive() bool {
+	if len(t.update) != 0 {
+		return true
+	}
+
+	// checking if we still have active workers
+	for _, w := range t.workers {
+		if w.isStatus(live) {
+			return true
+		}
+		// worker is ready to be stopped
+		// nothing in update channel and no active tasks inside
+		w.stop()
+	}
+
+	for _, w := range t.workers {
+		if !w.isStatus(stopped) {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (t *TaskQ) Shutdown(ctx context.Context) error {
 	if !atomic.CompareAndSwapInt32(&t.isClosing, 0, 1) {
 		return errors.New("taskq is closing")
 	}
 
 	defer close(t.update)
-	if wait, ok := ctx.Value(ctxWaitKey{}).(bool); !ok || !wait {
+	if wait, _ := ctx.Value(ctxWaitKey{}).(bool); !wait {
 		atomic.StoreInt32(&t.isStopped, 1)
+	} else {
+		t.triggerDequeue()
 	}
 
 	err := t.taskManager.Shutdown(ctx)
@@ -184,27 +214,7 @@ func (t *TaskQ) Shutdown(ctx context.Context) error {
 
 	var pollDuration = time.Millisecond * 500
 	timer := time.NewTimer(pollDuration)
-	for {
-		// checking if we still have active workers
-		hasActive := false
-		for _, w := range t.workers {
-			if w.isStatus(live) {
-				hasActive = true
-				break
-			}
-		}
-
-		if !hasActive {
-			for _, w := range t.workers {
-				w.stop()
-				if !w.isStatus(stopped) {
-					hasActive = true
-					break
-				}
-			}
-			return nil
-		}
-
+	for t.hasActive() {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -213,6 +223,8 @@ func (t *TaskQ) Shutdown(ctx context.Context) error {
 			timer.Reset(time.Duration(float64(pollDuration) * delta))
 		}
 	}
+
+	return nil
 }
 
 func (t *TaskQ) Close() error {
