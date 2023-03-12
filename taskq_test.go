@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/antonmashko/taskq"
 )
@@ -100,4 +101,36 @@ func TestTaskqSequentialExecution_Ok(t *testing.T) {
 			t.Fatalf("invalid value from channel. expected:%d actual:%d", curr, i)
 		}
 	}
+}
+
+func TestTaskqLimit1EnqueueBeforeStart_Ok(t *testing.T) {
+	tq := taskq.New(1)
+	var wg sync.WaitGroup
+	count := 5
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		tq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+			time.Sleep(time.Millisecond)
+			wg.Done()
+			return nil
+		}))
+	}
+	tq.Start()
+	wg.Wait()
+}
+
+func TestTaskqLimit1EnqueueAfterStart_Ok(t *testing.T) {
+	tq := taskq.New(1)
+	tq.Start()
+	var wg sync.WaitGroup
+	count := 5
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		tq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error {
+			time.Sleep(time.Millisecond)
+			wg.Done()
+			return nil
+		}))
+	}
+	wg.Wait()
 }
