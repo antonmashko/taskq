@@ -9,7 +9,7 @@ import (
 	"github.com/antonmashko/taskq"
 )
 
-func TestGracefulShutdownWithWait(t *testing.T) {
+func TestGracefulShutdownWithWait_Ok(t *testing.T) {
 	res := int32(0)
 	tq := taskq.New(0)
 	if err := tq.Start(); err != nil {
@@ -36,7 +36,7 @@ func TestGracefulShutdownWithWait(t *testing.T) {
 	}
 }
 
-func TestGracefulShutdownWithoutWait(t *testing.T) {
+func TestGracefulShutdownWithoutWait_Ok(t *testing.T) {
 	res := int32(0)
 	tq := taskq.New(10)
 	tf := taskq.TaskFunc(func(ctx context.Context) error {
@@ -65,7 +65,7 @@ func TestGracefulShutdownWithoutWait(t *testing.T) {
 	}
 }
 
-func TestGracefulShutdownWithTimeout(t *testing.T) {
+func TestGracefulShutdownWithTimeout_Ok(t *testing.T) {
 	var result bool
 	tq := taskq.New(10)
 	ch := make(chan struct{})
@@ -96,5 +96,16 @@ func TestGracefulShutdownWithTimeout(t *testing.T) {
 
 	if result {
 		t.Fail()
+	}
+}
+
+func TestCloseAfterClose_Err(t *testing.T) {
+	tq := taskq.New(0)
+	err := tq.Close()
+	if err != nil {
+		t.Fatal("error on first close:", err)
+	}
+	if err = tq.Close(); err != taskq.ErrClosed {
+		t.Fatalf("invalid error. expected=%s got=%s", taskq.ErrClosed, err)
 	}
 }

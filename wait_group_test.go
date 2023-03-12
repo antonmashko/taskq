@@ -7,7 +7,7 @@ import (
 )
 
 func TestWaitGroupEnqueue(t *testing.T) {
-	wg := NewWaitGroup(2)
+	wg := NewWaitGroup(0)
 	var result int64
 	const expected = 10
 	for i := 0; i < expected; i++ {

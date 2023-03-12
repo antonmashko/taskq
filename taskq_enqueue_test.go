@@ -2,12 +2,44 @@ package taskq_test
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
 
 	"github.com/antonmashko/taskq"
 )
+
+type testQueue struct {
+	sync.Mutex
+	t          taskq.Task
+	enqueueErr error
+	dequeueErr error
+}
+
+func (q *testQueue) Enqueue(_ context.Context, t taskq.Task) (int64, error) {
+	q.Lock()
+	defer q.Unlock()
+	if q.enqueueErr != nil {
+		return -1, q.enqueueErr
+	}
+	q.t = t
+	return 1, nil
+}
+
+func (q *testQueue) Dequeue(_ context.Context) (taskq.Task, error) {
+	q.Lock()
+	defer q.Unlock()
+	if q.dequeueErr != nil {
+		err := q.dequeueErr
+		q.dequeueErr = nil
+		return nil, err
+	}
+	if q.t == nil {
+		return nil, taskq.EmptyQueue
+	}
+	return q.t, nil
+}
 
 func TestEnqueueNilTask_Err(t *testing.T) {
 	tq := taskq.New(1)
@@ -86,4 +118,32 @@ func TestEnqueueToClosingTaskq_Ok(t *testing.T) {
 	if id != -1 || err != taskq.ErrClosed {
 		t.Fail()
 	}
+}
+
+func TestErrorFromEnqueue_Err(t *testing.T) {
+	q := &testQueue{}
+	tq := taskq.NewWithQueue(0, q)
+	q.enqueueErr = errors.New("enqueue error")
+	_, err := tq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error { return nil }))
+	if err != q.enqueueErr {
+		t.Fatalf("invalid error. expected=%s got=%s", q.enqueueErr, err)
+	}
+}
+
+func TestErrorFromDequeue_Err(t *testing.T) {
+	q := &testQueue{}
+	expectedErr := errors.New("dequeue error")
+	q.dequeueErr = expectedErr
+	tq := taskq.NewWithQueue(0, q)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	tq.OnDequeueError = func(ctx context.Context, workerID uint64, err error) {
+		if err != q.dequeueErr {
+			t.Errorf("invalid error. expected=%s got=%s", expectedErr, err)
+		}
+		wg.Done()
+	}
+	tq.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error { return nil }))
+	tq.Start()
+	wg.Wait()
 }

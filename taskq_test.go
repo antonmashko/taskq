@@ -40,7 +40,7 @@ func TestTaskqDoubleStart_Err(t *testing.T) {
 	if err := tq.Start(); err != nil {
 		t.Fail()
 	}
-	if err := tq.Start(); err == nil {
+	if err := tq.Start(); err == nil && err != taskq.ErrStarted {
 		t.Fail()
 	}
 }
@@ -63,6 +63,17 @@ func TestTaskqStartOnNotEmptyQueue_Ok(t *testing.T) {
 	tq := taskq.NewWithQueue(0, q)
 	tq.Start()
 	wg.Wait()
+}
+
+func TestTaskqStartAfterClose_Err(t *testing.T) {
+	tq := taskq.New(0)
+	err := tq.Close()
+	if err != nil {
+		t.Fatal("close:", err)
+	}
+	if err = tq.Start(); err != taskq.ErrClosed {
+		t.Fatalf("invalid error. expected=%s got=%s", taskq.ErrClosed, err)
+	}
 }
 
 func TestTaskqSequentialExecution_Ok(t *testing.T) {
