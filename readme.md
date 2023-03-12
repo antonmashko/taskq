@@ -71,7 +71,7 @@ func main() {
 More examples [here](example)
 
 ## Persistence and Queues
-By default TaskQ stores all tasks in memory using [ConcurrencyQueue](https://pkg.go.dev/github.com/antonmashko/taskq#ConcurrentQueue). For creating custom queue you need to implement interface [Queue](https://pkg.go.dev/github.com/antonmashko/taskq#Queue) and pass it as argument on creating [NewWithQueue](https://pkg.go.dev/github.com/antonmashko/taskq#NewWithQueue) or [PoolWithQueue](https://pkg.go.dev/github.com/antonmashko/taskq#PoolWithQueue).
+By default TaskQ stores all tasks in memory using [ConcurrencyQueue](https://pkg.go.dev/github.com/antonmashko/taskq#ConcurrentQueue). For creating custom queue you need to implement interface [Queue](https://pkg.go.dev/github.com/antonmashko/taskq#Queue) and pass it as argument on creating [NewWithQueue](https://pkg.go.dev/github.com/antonmashko/taskq#NewWithQueue).
 See [example](example/redis-custom-queue) of how to adapt redis queue into TaskQ
 
 ## Task Events
