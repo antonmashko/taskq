@@ -14,12 +14,6 @@ func TestNew_Ok(t *testing.T) {
 	}
 }
 
-func TestPool_Ok(t *testing.T) {
-	if tq := taskq.Pool(0); tq == nil {
-		t.Fail()
-	}
-}
-
 func TestEnqueueUniqueIDOk(t *testing.T) {
 	tq := taskq.New(1)
 	var wg sync.WaitGroup

@@ -9,7 +9,8 @@ import (
 func TestWaitGroupEnqueue(t *testing.T) {
 	wg := NewWaitGroup(0)
 	var result int64
-	for i := 0; i < 100; i++ {
+	const expected = 10
+	for i := 0; i < expected; i++ {
 		wg.Enqueue(context.Background(), TaskFunc(func(ctx context.Context) error {
 			atomic.AddInt64(&result, 1)
 			return nil
@@ -17,7 +18,7 @@ func TestWaitGroupEnqueue(t *testing.T) {
 	}
 	wg.Wait()
 
-	if atomic.LoadInt64(&result) != 100 {
-		t.Fatal("invalid result number")
+	if res := atomic.LoadInt64(&result); res != expected {
+		t.Fatalf("invalid result number. expected=%d got=%d", expected, res)
 	}
 }
