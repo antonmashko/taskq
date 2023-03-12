@@ -35,23 +35,10 @@ func BenchmarkSpawningGoroutines_SleepF(b *testing.B) {
 		b.Run(s.String(), func(b *testing.B) {
 			SpawningGoroutinesTestF(b, func(ctx context.Context) {
 				time.Sleep(s)
-			})
-		})
-	}
-}
+				for i := 0; i < 1000; i++ {
 
-func BenchmarkTaskqPool_SleepF(b *testing.B) {
-	sleeps := []time.Duration{
-		time.Microsecond,
-		50 * time.Microsecond,
-		time.Millisecond,
-		50 * time.Millisecond,
-	}
-
-	for _, s := range sleeps {
-		b.Run(s.String(), func(b *testing.B) {
-			TaskqPoolTestF(b, func(ctx context.Context) {
-				time.Sleep(s)
+				}
+				time.Sleep(time.Millisecond)
 			})
 		})
 	}
