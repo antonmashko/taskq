@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"sync"
-	"sync/atomic"
 )
 
 var (
@@ -52,34 +51,4 @@ func (q *ConcurrentQueue) Dequeue(_ context.Context) (Task, error) {
 
 func (q *ConcurrentQueue) Len(_ context.Context) int {
 	return len(q.queue)
-}
-
-type LimitedConcurrentQueue struct {
-	lastInc int64
-	ch      chan Task
-}
-
-func NewLimitedConcurrentQueue(size int) *LimitedConcurrentQueue {
-	return &LimitedConcurrentQueue{ch: make(chan Task, size)}
-}
-
-func (q *LimitedConcurrentQueue) Enqueue(_ context.Context, t Task) (int64, error) {
-	q.ch <- t
-	return atomic.AddInt64(&q.lastInc, 1), nil
-}
-
-func (q *LimitedConcurrentQueue) Dequeue(ctx context.Context) (Task, error) {
-	select {
-	case t := <-q.ch:
-		if t == nil {
-			return nil, EmptyQueue
-		}
-		return t, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-}
-
-func (q *LimitedConcurrentQueue) Len(_ context.Context) int {
-	return len(q.ch)
 }

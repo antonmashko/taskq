@@ -38,16 +38,6 @@ func TestBlockingQueueDequeueOK(t *testing.T) {
 	}
 }
 
-func BenchmarkBlockingQueue(b *testing.B) {
-	q := taskq.NewConcurrentQueue()
-	// q.queue = append(q.queue, &itask{})
-	for i := 0; i < b.N; i++ {
-		q.Enqueue(context.Background(), taskq.TaskFunc(func(ctx context.Context) error { return nil }))
-		q.Dequeue(context.Background())
-	}
-}
-
 func TestTaskqQueueImplementation(t *testing.T) {
 	var _ taskq.Queue = taskq.NewConcurrentQueue()
-	var _ taskq.Queue = taskq.NewLimitedConcurrentQueue(0)
 }
