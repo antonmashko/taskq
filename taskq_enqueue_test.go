@@ -138,7 +138,7 @@ func TestErrorFromDequeue_Err(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	tq.OnDequeueError = func(ctx context.Context, workerID uint64, err error) {
-		if err != q.dequeueErr {
+		if err != expectedErr {
 			t.Errorf("invalid error. expected=%s got=%s", expectedErr, err)
 		}
 		wg.Done()
